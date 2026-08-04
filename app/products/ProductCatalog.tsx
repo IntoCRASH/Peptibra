@@ -25,7 +25,7 @@ export default function ProductCatalog(){
     <div className="pb-catalog-panel">
       <label className="pb-catalog-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} type="search" placeholder="Buscar producto, categoría o presentación..." aria-label="Buscar productos"/></label>
       <div className="pb-catalog-selects">
-        <label>Disponibilidad<select value={availability} onChange={e=>setAvailability(e.target.value)}><option>Todos</option><option>Disponible</option><option>Disponibilidad limitada</option></select></label>
+        <label>Disponibilidad<select value={availability} onChange={e=>setAvailability(e.target.value)}><option>Todos</option><option>Backordered</option></select></label>
         <label>Ordenar<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Selección Peptibra</option><option value="name">Nombre A–Z</option><option value="dose">Presentación</option></select></label>
       </div>
       <div className="pb-category-tabs" aria-label="Filtrar por categoría">{categories.map(c=><button type="button" className={category===c?"active":""} onClick={()=>setCategory(c)} key={c}>{c}</button>)}</div>
