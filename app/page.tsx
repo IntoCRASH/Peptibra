@@ -12,7 +12,7 @@ export default function Home() {
         <h1>Un hub especializado<br/><span>en péptidos de investigación.</span></h1>
         <p>Descubre una selección respaldada por información de lote, documentación analítica y una visión clara de la disponibilidad.</p>
         <div className="pb-actions"><Link className="pb-btn primary" href="/products">Explorar catálogo →</Link><a className="pb-btn secondary" href="#reportes">Consultar COAs</a></div>
-        <p className="pb-helper">Conoce <a href="#modelo">cómo funciona nuestro modelo</a> o revisa las <a href="#faq">preguntas frecuentes</a>.</p>
+        <p className="pb-helper">Conoce <a href="#modelo">cómo funciona nuestro modelo</a> o revisa las <Link href="/faq">preguntas frecuentes</Link>.</p>
       </div>
       <aside className="pb-verification" id="reportes">
         <div className="pb-card-head"><span className="pb-flask">⌬</span><div><b>Última verificación de lote</b><small>LOTE PB2601 · ANÁLISIS INDEPENDIENTE</small></div></div>
@@ -35,7 +35,7 @@ export default function Home() {
 
     <section className="pb-coming-soon"><span className="pb-kicker">PEPTIBRA EVOLUCIONA</span><h2>Una experiencia cada vez más completa.</h2><p>Estamos preparando una forma segura y transparente de adquirir productos directamente desde Peptibra, con disponibilidad actualizada y documentación vinculada a cada lote.</p><Link className="pb-btn secondary" href="/products">Conocer la selección</Link></section>
 
-    <section className="pb-faq" id="faq"><span className="pb-kicker">FAQ</span><h2>Un catálogo claro y documentado.</h2><details><summary>¿Peptibra fabrica los productos?</summary><p>Peptibra funciona como un hub especializado que consolida inventario y documentación de distintos suplidores seleccionados.</p></details><details><summary>¿Dónde encuentro el COA?</summary><p>Los certificados se organizan por producto y lote, según la documentación disponible del suplidor correspondiente.</p></details><details><summary>¿Puedo comprar desde la página?</summary><p>La compra directa todavía no está habilitada. Próximamente Peptibra incorporará una experiencia de adquisición integrada al catálogo.</p></details></section>
+    <section className="pb-faq" id="faq"><span className="pb-kicker">FAQ</span><h2>Un catálogo claro y documentado.</h2><details><summary>¿Peptibra fabrica los productos?</summary><p>Peptibra funciona como un hub especializado que consolida inventario y documentación de distintos suplidores seleccionados.</p></details><details><summary>¿Dónde encuentro el COA?</summary><p>Los certificados se organizan por producto y lote, según la documentación disponible del suplidor correspondiente.</p></details><details><summary>¿Puedo comprar desde la página?</summary><p>La compra directa todavía no está habilitada. Próximamente Peptibra incorporará una experiencia de adquisición integrada al catálogo.</p></details><Link className="pb-faq-more" href="/faq">Consultar todas las preguntas →</Link></section>
     <footer id="contacto"><Image src="/peptibra-logo-dark.png" width={1774} height={887} alt="Peptibra" unoptimized/><p>Productos destinados exclusivamente a fines de investigación. No aptos para consumo humano.</p><a href="mailto:info@peptibra.com">info@peptibra.com</a></footer>
   </main>;
 }
