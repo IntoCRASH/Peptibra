@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { LanguageSwitcher } from "./LanguageProvider";
 
 const STORAGE_KEY = "peptibra_researcher_verified_v2";
 
@@ -58,6 +59,7 @@ export default function VerificationGate() {
         aria-modal="true"
         aria-labelledby="verification-title"
       >
+        <LanguageSwitcher compact/>
         <div className="verification-logo" aria-label="Peptibra · Peptide Depot">
           <Image
             src="/peptibra-logo-dark.png"

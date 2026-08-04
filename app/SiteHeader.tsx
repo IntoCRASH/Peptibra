@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LanguageSwitcher } from "./LanguageProvider";
 
 export default function SiteHeader() {
   return <>
@@ -8,7 +9,7 @@ export default function SiteHeader() {
       <nav aria-label="Navegación principal">
         <Link href="/products">Catálogo</Link><Link href="/#modelo">Nuestro modelo</Link><Link href="/#reportes">COAs</Link><Link href="/faq">FAQ</Link><Link href="/#contacto">Contacto</Link>
       </nav>
-      <Link className="pb-login" href="/admin">Acceso privado</Link>
+      <LanguageSwitcher compact/><Link className="pb-login" href="/admin">Acceso privado</Link>
     </header>
   </>;
 }
