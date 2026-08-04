@@ -59,7 +59,7 @@ const sections = [
       },
       {
         question: "¿Cómo solicito información sobre un producto o documento?",
-        answer: "Escríbenos a info@peptibra.com e indica el nombre del producto y, si aplica, el número de lote. Esto nos permite responder con la información más pertinente.",
+        answer: "Escríbenos a peptibra@gmail.com e indica el nombre del producto y, si aplica, el número de lote. Esto nos permite responder con la información más pertinente.",
       },
     ],
   },
@@ -71,7 +71,7 @@ export default function FAQPage() {
       <span className="pb-kicker">CENTRO DE INFORMACIÓN</span>
       <h1>Preguntas frecuentes</h1>
       <p>Respuestas claras sobre el modelo de Peptibra, la documentación analítica y la forma correcta de interpretar nuestro catálogo.</p>
-      <div><Link href="/products">Explorar catálogo</Link><a href="mailto:info@peptibra.com">Contactar a Peptibra</a></div>
+      <div><Link href="/products">Explorar catálogo</Link><a href="mailto:peptibra@gmail.com">Contactar a Peptibra</a></div>
     </section>
     <section className="pb-faq-layout">
       <aside><span>EN ESTA PÁGINA</span>{sections.map(section=><a key={section.title} href={`#${section.title.toLowerCase().replaceAll(" ","-").replaceAll("á","a")}`}>{section.title}</a>)}</aside>
@@ -80,7 +80,7 @@ export default function FAQPage() {
         return <section id={id} key={section.title}><span className="pb-kicker">{section.title}</span>{section.items.map(item=><details key={item.question}><summary>{item.question}</summary><p>{item.answer}</p></details>)}</section>;
       })}</div>
     </section>
-    <section className="pb-faq-contact"><span className="pb-kicker">¿NECESITAS MÁS INFORMACIÓN?</span><h2>Conversemos sobre tu consulta.</h2><p>Indica el producto o lote de interés para ayudarte con mayor precisión.</p><a className="pb-btn primary" href="mailto:info@peptibra.com">Escribir a Peptibra →</a></section>
-    <footer><Image src="/peptibra-logo-dark.png" width={1774} height={887} alt="Peptibra" unoptimized/><p>Productos destinados exclusivamente a fines de investigación. No aptos para consumo humano.</p><a href="mailto:info@peptibra.com">info@peptibra.com</a></footer>
+    <section className="pb-faq-contact"><span className="pb-kicker">¿NECESITAS MÁS INFORMACIÓN?</span><h2>Conversemos sobre tu consulta.</h2><p>Indica el producto o lote de interés para ayudarte con mayor precisión.</p><a className="pb-btn primary" href="mailto:peptibra@gmail.com">Escribir a Peptibra →</a></section>
+    <footer><Image src="/peptibra-logo-dark.png" width={1774} height={887} alt="Peptibra" unoptimized/><p>Productos destinados exclusivamente a fines de investigación. No aptos para consumo humano.</p><a href="mailto:peptibra@gmail.com">peptibra@gmail.com</a></footer>
   </main>;
 }
