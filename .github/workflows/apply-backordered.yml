@@ -1,0 +1,20 @@
+name: Apply backordered status
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          tar -xzf backordered-update.tar.gz
+          rm backordered-update.tar.gz
+          rm -f .github/workflows/apply-backordered.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Set all products to backordered"
+          git push
