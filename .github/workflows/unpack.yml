@@ -1,0 +1,25 @@
+name: Restore Peptibra source
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore source tree
+        run: |
+          cat peptibra-source.part* > peptibra-source.tar.gz
+          tar -xzf peptibra-source.tar.gz
+          rm peptibra-source.tar.gz peptibra-source.part*
+          rm -f .github/workflows/unpack.yml
+      - name: Commit restored project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore Peptibra application source"
+          git push
