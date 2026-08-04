@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type Product={id:number;name:string;sku:string;category:string;concentration:string;stock:number;reorderPoint:number;price:number;status:string};
 export default function AdminDashboard({userName,signOut}:{userName:string;signOut:string}){
  const [items,setItems]=useState<Product[]>([]),[loading,setLoading]=useState(true),[modal,setModal]=useState(false),[error,setError]=useState("");
- const load=()=>fetch("/api/products").then(r=>r.json()).then(d=>{setItems(d.products||[]);setLoading(false)}).catch(()=>{setError("No se pudo cargar el inventario");setLoading(false)}); useEffect(load,[]);
+ const load=()=>fetch("/api/products").then(r=>r.json()).then(d=>{setItems(d.products||[]);setLoading(false)}).catch(()=>{setError("No se pudo cargar el inventario");setLoading(false)}); useEffect(()=>{void load()},[]);
  const total=useMemo(()=>items.reduce((s,p)=>s+p.stock,0),[items]); const low=items.filter(p=>p.stock<=p.reorderPoint).length; const value=items.reduce((s,p)=>s+p.stock*p.price,0);
  async function add(e:FormEvent<HTMLFormElement>){e.preventDefault();setError("");const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch("/api/products",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(data)});if(!r.ok){setError((await r.json()).error||"No se pudo guardar");return}setModal(false);load()}
  async function move(p:Product,change:number){const r=await fetch("/api/products",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id:p.id,change,reason:change>0?"Entrada manual":"Salida manual"})});if(r.ok)load()}

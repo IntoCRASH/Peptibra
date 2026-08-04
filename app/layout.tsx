@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Playfair_Display } from "next/font/google";
 import "./globals.css";
-
-const sans = Manrope({ variable: "--font-sans", subsets: ["latin"] });
-const display = Playfair_Display({ variable: "--font-display", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Peptibra · Peptide Depot",
@@ -14,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{children: React.ReactNode}>) {
-  return <html lang="es"><body className={`${sans.variable} ${display.variable}`}>{children}</body></html>;
+  return <html lang="es"><body>{children}</body></html>;
 }
