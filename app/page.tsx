@@ -8,7 +8,7 @@ export default function Home() {
   return <main className="pb-site"><VerificationGate/><SiteHeader/>
     <section className="pb-hero">
       <div className="pb-hero-copy">
-        <span className="pb-pill"><i/> INFORMACIÓN, TRAZABILIDAD Y EVIDENCIA</span>
+        <span className="pb-pill"><i/> EL LOTE COMO PUNTO DE PARTIDA</span>
         <h1>Un hub especializado<br/><span>en péptidos de investigación.</span></h1>
         <p>Descubre una selección respaldada por información de lote, documentación analítica y una visión clara de la disponibilidad.</p>
         <div className="pb-actions"><Link className="pb-btn primary" href="/products">Explorar catálogo →</Link><a className="pb-btn secondary" href="#reportes">Consultar COAs</a></div>
