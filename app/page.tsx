@@ -37,5 +37,14 @@ export default function Home() {
 
     <section className="pb-faq" id="faq"><span className="pb-kicker">FAQ</span><h2>Un catálogo claro y documentado.</h2><details><summary>¿Peptibra fabrica los productos?</summary><p>Peptibra funciona como un hub especializado que consolida inventario y documentación de distintos suplidores seleccionados.</p></details><details><summary>¿Dónde encuentro el COA?</summary><p>Los certificados se organizan por producto y lote, según la documentación disponible del suplidor correspondiente.</p></details><details><summary>¿Puedo comprar desde la página?</summary><p>La compra directa todavía no está habilitada. Próximamente Peptibra incorporará una experiencia de adquisición integrada al catálogo.</p></details><Link className="pb-faq-more" href="/faq">Consultar todas las preguntas →</Link></section>
     <footer id="contacto"><Image src="/peptibra-logo-dark.png" width={1774} height={887} alt="Peptibra" unoptimized/><p>Productos destinados exclusivamente a fines de investigación. No aptos para consumo humano.</p><a href="mailto:peptibra@gmail.com">peptibra@gmail.com</a></footer>
+    <section className="pb-legal-disclaimer" aria-label="Research use disclaimer">
+      <div>
+        <strong>FOR RESEARCH USE ONLY. NOT FOR HUMAN USE.</strong>
+        <p><b>FDA Disclaimer:</b> The content and products mentioned on this website have not been evaluated by the U.S. Food and Drug Administration (FDA). These products are not intended to diagnose, treat, cure, or prevent any disease. All products are sold exclusively for research, laboratory, or analytical purposes and are intended for controlled laboratory research use. The information provided is strictly for informational purposes only.</p>
+        <p>All products are sold for research, laboratory, or analytical purposes only and are intended for controlled laboratory research use.</p>
+        <p>Peptibra is a chemical supplier. Peptibra is not a compounding pharmacy or chemical compounding facility as defined under Section 503A of the Federal Food, Drug, and Cosmetic Act. Peptibra is not an outsourcing facility as defined under Section 503B of the Federal Food, Drug, and Cosmetic Act. The statements made within this website have not been evaluated by the U.S. Food and Drug Administration. The products we offer are not intended to diagnose, treat, cure, or prevent any disease. For laboratory in vitro experimental use only.</p>
+        <small>Copyright © 2026 Peptibra</small>
+      </div>
+    </section>
   </main>;
 }
