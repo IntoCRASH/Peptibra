@@ -1,30 +1,30 @@
 import { getAuthorizedUser } from "@/app/chatgpt-auth";
-import { allRows, pgDb } from "@/db/postgres-compat";
+import { pgDb } from "@/db/postgres-compat";
+import { createClient } from "@supabase/supabase-js";
 
 type Data = Record<string, unknown>;
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 const num = (v: unknown, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 const str = (v: unknown) => String(v ?? "").trim();
-const all = allRows;
 
 export async function GET() {
   const user = await getAuthorizedUser(); if (!user) return json({ error: "No autorizado" }, 403);
-  const [products, balances, team, clients, invoices, invoiceItems, cash, suppliers, purchases, calculations, protocols, settings] = await Promise.all([
-    all(`SELECT p.*,pp.description,pp.photo_key,pp.unit_cost,pp.normal_price,pp.bac_price,pp.wholesale_mg_price,pp.wholesale_minimum
-      FROM products p LEFT JOIN product_profiles pp ON pp.product_id=p.id WHERE p.status='active' ORDER BY p.name`),
-    all("SELECT * FROM inventory_balances ORDER BY product_id,location"),
-    all("SELECT t.*,s.name partner_name FROM team t LEFT JOIN team s ON s.id=t.partner_id WHERE t.active=1 ORDER BY t.name"),
-    all("SELECT * FROM clients WHERE active=1 ORDER BY id DESC"),
-    all(`SELECT i.*,c.code client_code,c.first_name||' '||c.last_name client_name,t.name seller_name FROM invoices i
-      JOIN clients c ON c.id=i.client_id JOIN team t ON t.id=i.seller_id ORDER BY i.id DESC LIMIT 250`),
-    all("SELECT * FROM invoice_items ORDER BY id DESC LIMIT 1000"),
-    all("SELECT cm.*,t.name partner_name FROM cash_movements cm LEFT JOIN team t ON t.id=cm.partner_id ORDER BY cm.id DESC LIMIT 500"),
-    all("SELECT * FROM suppliers WHERE active=1 ORDER BY name"),
-    all(`SELECT p.*,s.name supplier_name,t.name partner_name FROM purchases p JOIN suppliers s ON s.id=p.supplier_id
-      LEFT JOIN team t ON t.id=p.partner_id ORDER BY p.id DESC LIMIT 500`),
-    all("SELECT * FROM calculations ORDER BY name"), all("SELECT * FROM protocols ORDER BY updated_at DESC"), all("SELECT key,value FROM app_settings"),
+  const supabase=createClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}});
+  const table=async(name:string)=>{const {data,error}=await supabase.from(name).select("*");if(error)throw error;return data as Data[]};
+  try {
+  const [productRows,profiles,balances,teamRows,clientRows,invoiceRows,invoiceItems,cashRows,supplierRows,purchaseRows,calculations,protocols,settings] = await Promise.all([
+    table("products"),table("product_profiles"),table("inventory_balances"),table("team"),table("clients"),table("invoices"),table("invoice_items"),table("cash_movements"),table("suppliers"),table("purchases"),table("calculations"),table("protocols"),table("app_settings"),
   ]);
+  const byId=(rows:Data[])=>new Map(rows.map(x=>[Number(x.id),x])),teamMap=byId(teamRows),clientMap=byId(clientRows),supplierMap=byId(supplierRows),profileMap=new Map(profiles.map(x=>[Number(x.product_id),x]));
+  const products=productRows.filter(x=>x.status==="active").map(x=>({...x,...profileMap.get(Number(x.id))}));
+  const team=teamRows.filter(x=>Number(x.active)===1).map(x=>({...x,partner_name:teamMap.get(Number(x.partner_id))?.name??null}));
+  const clients=clientRows.filter(x=>Number(x.active)===1);
+  const invoices=invoiceRows.map(x=>{const c=clientMap.get(Number(x.client_id)),t=teamMap.get(Number(x.seller_id));return {...x,client_code:c?.code,client_name:`${c?.first_name??""} ${c?.last_name??""}`.trim(),seller_name:t?.name}});
+  const cash=cashRows.map(x=>({...x,partner_name:teamMap.get(Number(x.partner_id))?.name??null}));
+  const suppliers=supplierRows.filter(x=>Number(x.active)===1);
+  const purchases=purchaseRows.map(x=>({...x,supplier_name:supplierMap.get(Number(x.supplier_id))?.name,partner_name:teamMap.get(Number(x.partner_id))?.name??null}));
   return json({ user:{name:user.displayName,email:user.email}, products,balances,team,clients,invoices,invoiceItems,cash,suppliers,purchases,calculations,protocols,settings });
+  } catch(error) { return json({error:error instanceof Error?error.message:"No se pudieron cargar los datos"},500); }
 }
 
 export async function POST(request: Request) {
