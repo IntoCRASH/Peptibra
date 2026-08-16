@@ -32,9 +32,9 @@ export async function POST(request: Request) {
   const body=await request.json() as {action?:string;data?:Data},action=str(body.action),d=body.data??{},now=new Date().toISOString(),db=pgDb;
   try {
     if(action==="createProduct"){
-      const name=str(d.name),sku=str(d.sku).toUpperCase();if(!name||!sku)return json({error:"Nombre y cÃ³digo son obligatorios"},400);
+      const name=str(d.name),sku=str(d.sku).toUpperCase();if(!name||!sku)return json({error:"Nombre y código son obligatorios"},400);
       const r=await db.prepare(`INSERT INTO products(name,sku,category,concentration,stock,reorder_point,price,status,created_at,updated_at) VALUES(?,?,?,?,0,?,?,?, ?,?)`)
-        .bind(name,sku,str(d.category)||"PÃ©ptido",str(d.concentration),num(d.reorderPoint,5),num(d.normalPrice),"active",now,now).run(),id=Number(r.meta.last_row_id),stock=Math.trunc(num(d.stock));
+        .bind(name,sku,str(d.category)||"Péptido",str(d.concentration),num(d.reorderPoint,5),num(d.normalPrice),"active",now,now).run(),id=Number(r.meta.last_row_id),stock=Math.trunc(num(d.stock));
       await db.batch([db.prepare(`INSERT INTO product_profiles(product_id,description,unit_cost,normal_price,bac_price,wholesale_mg_price,wholesale_minimum) VALUES(?,?,?,?,?,?,?)`)
         .bind(id,str(d.description),num(d.unitCost),num(d.normalPrice),num(d.bacPrice),num(d.wholesaleMgPrice),num(d.wholesaleMinimum,10)),
         db.prepare("INSERT INTO inventory_balances(product_id,location,quantity,updated_at) VALUES(?,?,?,?)").bind(id,"GENERAL",stock,now),
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       const id=num(d.productId),location=str(d.location)||"GENERAL",change=Math.trunc(num(d.change));
       const old=await db.prepare("SELECT quantity FROM inventory_balances WHERE product_id=? AND location=?").bind(id,location).first<{quantity:number}>(),next=(old?.quantity??0)+change;
       await db.batch([db.prepare(`INSERT INTO inventory_balances(product_id,location,quantity,updated_at) VALUES(?,?,?,?) ON CONFLICT(product_id,location) DO UPDATE SET quantity=excluded.quantity,updated_at=excluded.updated_at`).bind(id,location,next,now),
-        db.prepare("INSERT INTO inventory_movements(product_id,change,reason,actor_id,created_at) VALUES(?,?,?,?,?)").bind(id,change,str(d.reason)||"Ajuste mÃ³vil",user.userId,now)]);return json({ok:true,quantity:next});
+        db.prepare("INSERT INTO inventory_movements(product_id,change,reason,actor_id,created_at) VALUES(?,?,?,?,?)").bind(id,change,str(d.reason)||"Ajuste móvil",user.userId,now)]);return json({ok:true,quantity:next});
     }
     if(action==="saveTeam"){
       const role=str(d.role)||"Vendedor",partnerId=role==="Socio"?null:(num(d.partnerId)||null);if(role==="Vendedor"&&str(d.partnerMode)==="1"&&!partnerId)return json({error:"Selecciona el socio responsable"},400);
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     if(action==="saveProtocol"){const r=await db.prepare(`INSERT INTO protocols(product_id,name,vial_mg,diluent_ml,dose,unit,every_days,weeks,include_instructions,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`).bind(num(d.productId),str(d.name),num(d.vialMg),num(d.diluentMl),num(d.dose),str(d.unit)||"mg",num(d.everyDays,7),num(d.weeks,4),d.includeInstructions?1:0,now).run();return json({ok:true,id:r.meta.last_row_id},201);}
     if(action==="saveSetting"){await db.prepare(`INSERT INTO app_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`).bind(str(d.key),str(d.value),now).run();return json({ok:true});}
     if(action==="archive"){const map:Record<string,string>={product:"products",team:"team",client:"clients",supplier:"suppliers"},table=map[str(d.entity)];if(!table)return json({error:"Registro no eliminable"},400);const field=table==="products"?"status":"active";await db.prepare(`UPDATE ${table} SET ${field}=? WHERE id=?`).bind(table==="products"?"archived":0,num(d.id)).run();return json({ok:true});}
-    return json({error:"AcciÃ³n desconocida"},400);
-  }catch(error){return json({error:error instanceof Error?error.message:"No se pudo completar la acciÃ³n"},500);}
+    return json({error:"Acción desconocida"},400);
+  }catch(error){return json({error:error instanceof Error?error.message:"No se pudo completar la acción"},500);}
 }
 

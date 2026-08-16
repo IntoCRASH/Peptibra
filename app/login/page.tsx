@@ -1,7 +1,61 @@
 "use client";
+
+import Image from "next/image";
 import { FormEvent, Suspense, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useSearchParams } from "next/navigation";
-function LoginContent(){const [sent,setSent]=useState(false),[error,setError]=useState("");const q=useSearchParams(),next=q.get("next")||"/ptbr-mobile";async function submit(e:FormEvent){e.preventDefault();setError("");const email=String(new FormData(e.currentTarget as HTMLFormElement).get("email")||"").toLowerCase();if(email!=="cruzmonty1983@gmail.com"){setError("Esta cuenta no estÃ¡ autorizada.");return}const s=createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);const {error}=await s.auth.signInWithOtp({email,options:{emailRedirectTo:`${location.origin}/auth/callback?next=${encodeURIComponent(next)}`}});if(error)setError(error.message);else setSent(true)}return <main className="login-page"><form onSubmit={submit}><i>P</i><span>PEPTIBRA Â· ACCESO PRIVADO</span><h1>Oficina mÃ³vil</h1>{sent?<p>Revisa tu correo. Te enviamos un enlace seguro para entrar.</p>:<><label>Correo autorizado<input name="email" type="email" defaultValue="cruzmonty1983@gmail.com" required/></label><button>Enviar enlace de acceso</button></>}{error&&<p className="login-error">{error}</p>}</form></main>}
-export default function Login(){return <Suspense fallback={<main className="login-page"/>}><LoginContent/></Suspense>}
 
+const AUTHORIZED_EMAIL = "cruzmonty1983@gmail.com";
+
+function LoginContent() {
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const query = useSearchParams();
+  const next = query.get("next") || "/ptbr-mobile";
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "").trim().toLowerCase();
+    const password = String(form.get("password") || "");
+    if (email !== AUTHORIZED_EMAIL) {
+      setError("Esta cuenta no está autorizada.");
+      setLoading(false);
+      return;
+    }
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) {
+      setError("Correo o contraseña incorrectos.");
+      setLoading(false);
+      return;
+    }
+    window.location.assign(next);
+  }
+
+  return (
+    <main className="login-page">
+      <form onSubmit={submit}>
+        <div className="login-brand">
+          <Image src="/peptibra-logo-original.png" width={1774} height={887} alt="Peptibra Peptide Depot" priority />
+        </div>
+        <span>ACCESO PRIVADO</span>
+        <h1>Oficina móvil</h1>
+        <p className="login-intro">Gestión segura de Peptibra desde cualquier dispositivo.</p>
+        <label>Correo autorizado<input name="email" type="email" defaultValue={AUTHORIZED_EMAIL} autoComplete="username" required /></label>
+        <label>Contraseña<input name="password" type="password" autoComplete="current-password" required /></label>
+        <button disabled={loading}>{loading ? "Entrando…" : "Entrar"}</button>
+        {error && <p className="login-error">{error}</p>}
+      </form>
+    </main>
+  );
+}
+
+export default function Login() {
+  return <Suspense fallback={<main className="login-page" />}><LoginContent /></Suspense>;
+}
