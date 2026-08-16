@@ -78,7 +78,7 @@ export async function POST(request: Request) {
         }
       }
       const revision = new Date().toISOString();
-      await tx.unsafe(`insert into app_settings(key,value,updated_at) values('mobile_data_revision',$1,$1) on conflict(key) do update set value=$1,updated_at=$1`, [revision]);
+      await tx.unsafe(`insert into app_settings(key,value,updated_at) values('mobile_data_revision',$1::text,$1::timestamptz) on conflict(key) do update set value=$1::text,updated_at=$1::timestamptz`, [revision]);
       for (const table of TABLES.filter(x => !["product_profiles","inventory_balances","app_settings"].includes(x))) {
         await tx.unsafe(`select setval(pg_get_serial_sequence('${table}','id'), greatest(coalesce((select max(id) from "${table}"),1),1), true)`).catch(()=>{});
       }
