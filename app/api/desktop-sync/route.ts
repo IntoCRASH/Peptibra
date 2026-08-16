@@ -48,7 +48,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!await authorized(request)) return Response.json({ error: "No autorizado" }, { status: 403 });
   try {
-    const payload = await request.json() as { tables?: Record<string, Record<string, unknown>[]> };
+    const payload = await request.json() as { tables?: Record<string, Record<string, unknown>[]>; image?: {productId:number,name:string,type:string,data:string} };
+    if (payload.image) {
+      const image=payload.image,key=`desktop-${payload.image.productId}-${Date.now()}-${payload.image.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+      const cloud=createClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}});
+      const bytes=Buffer.from(image.data,"base64");
+      if(bytes.length>8*1024*1024) return Response.json({error:"La imagen supera 8 MB"},{status:400});
+      const {error}=await cloud.storage.from("product-images").upload(key,bytes,{contentType:image.type||"image/png",upsert:true});if(error)throw error;
+      const {error:update}=await cloud.from("product_profiles").update({photo_key:key}).eq("product_id",image.productId);if(update)throw update;
+      return Response.json({ok:true,key});
+    }
     const supplied = payload.tables || {};
     const allowed = new Set(TABLES);
     const conflict: Record<string, string> = { product_profiles: "product_id", inventory_balances: "product_id,location", app_settings: "key" };
