@@ -12,8 +12,8 @@ export async function GET() {
   const supabase=createClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}});
   const table=async(name:string)=>{const {data,error}=await supabase.from(name).select("*");if(error)throw error;return data as Data[]};
   try {
-  const [productRows,profiles,balances,teamRows,clientRows,invoiceRows,invoiceItems,payments,cashRows,supplierRows,purchaseRows,calculations,protocols,settings] = await Promise.all([
-    table("products"),table("product_profiles"),table("inventory_balances"),table("team"),table("clients"),table("invoices"),table("invoice_items"),table("payments"),table("cash_movements"),table("suppliers"),table("purchases"),table("calculations"),table("protocols"),table("app_settings"),
+  const [productRows,profiles,balances,inventoryMovements,teamRows,clientRows,invoiceRows,invoiceItems,payments,cashRows,supplierRows,purchaseRows,calculations,protocols,internalWithdrawals,withdrawalPayments,settings] = await Promise.all([
+    table("products"),table("product_profiles"),table("inventory_balances"),table("inventory_movements"),table("team"),table("clients"),table("invoices"),table("invoice_items"),table("payments"),table("cash_movements"),table("suppliers"),table("purchases"),table("calculations"),table("protocols"),table("internal_withdrawals"),table("internal_withdrawal_payments"),table("app_settings"),
   ]);
   const byId=(rows:Data[])=>new Map(rows.map(x=>[Number(x.id),x])),teamMap=byId(teamRows),clientMap=byId(clientRows),supplierMap=byId(supplierRows),profileMap=new Map(profiles.map(x=>[Number(x.product_id),x]));
   const products=productRows.filter(x=>x.status==="active").map(x=>({...x,...profileMap.get(Number(x.id))}));
@@ -23,7 +23,8 @@ export async function GET() {
   const cash=cashRows.map(x=>({...x,partner_name:teamMap.get(Number(x.partner_id))?.name??null}));
   const suppliers=supplierRows.filter(x=>Number(x.active)===1);
   const purchases=purchaseRows.map(x=>({...x,supplier_name:supplierMap.get(Number(x.supplier_id))?.name,partner_name:teamMap.get(Number(x.partner_id))?.name??null}));
-  return json({ user:{name:user.displayName,email:user.email}, products,balances,team,clients,invoices,invoiceItems,payments,cash,suppliers,purchases,calculations,protocols,settings });
+  const withdrawals=internalWithdrawals.map(x=>({...x,team_member_id:x.team_id}));
+  return json({ user:{name:user.displayName,email:user.email}, products,balances,inventoryMovements,team,clients,invoices,invoiceItems,payments,cash,suppliers,purchases,calculations,protocols,internalWithdrawals:withdrawals,withdrawalPayments,settings });
   } catch(error) { return json({error:error instanceof Error?error.message:"No se pudieron cargar los datos"},500); }
 }
 
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
     if(action==="adjustStock"){
       const productId=num(d.productId),location=str(d.location)||"GENERAL",change=Math.trunc(num(d.change)),{data:balance,error}=await cloud.from("inventory_balances").select("id,quantity").eq("product_id",productId).eq("location",location).maybeSingle();if(error)throw error;const quantity=Number(balance?.quantity||0)+change;
       const mutation=balance?cloud.from("inventory_balances").update({quantity,updated_at:now}).eq("id",balance.id):cloud.from("inventory_balances").insert({product_id:productId,location,quantity,updated_at:now});const {error:balanceError}=await mutation;if(balanceError)throw balanceError;await cloud.from("inventory_movements").insert({product_id:productId,change,reason:str(d.reason)||"Ajuste móvil",actor_id:user.userId,created_at:now});return json({ok:true,quantity});
+    }
+    if(action==="transferInventory"){
+      const productId=num(d.productId),quantity=Math.max(1,Math.trunc(num(d.quantity))),from=str(d.from),to=str(d.to);if(!from||!to||from===to)return json({error:"Selecciona ubicaciones diferentes"},400);await changeBalance(productId,from,-quantity);await changeBalance(productId,to,quantity);const {error}=await cloud.from("inventory_movements").insert([{product_id:productId,change:-quantity,reason:`Transferencia móvil: ${from} → ${to}`,actor_id:user.userId,created_at:now},{product_id:productId,change:quantity,reason:`Transferencia móvil: ${from} → ${to}`,actor_id:user.userId,created_at:now}]);if(error)throw error;return json({ok:true});
     }
     if(action==="saveClient"){
       const id=num(d.id),values={first_name:str(d.firstName),last_name:str(d.lastName),phone:str(d.phone),active:1};if(id){const {error}=await cloud.from("clients").update(values).eq("id",id);if(error)throw error;return json({ok:true,id})}const {count}=await cloud.from("clients").select("id",{count:"exact",head:true}),code=str(d.code)||`PTBR${String((count||0)+1).padStart(6,"0")}`;const {data,error}=await cloud.from("clients").insert({...values,code,created_at:now}).select("id").single();if(error)throw error;return json({ok:true,id:data.id,code},201);
@@ -84,6 +88,15 @@ export async function POST(request: Request) {
     if(action==="saveProtocol"){const id=num(d.id),values={product_id:num(d.productId),name:str(d.name),vial_mg:num(d.vialMg),diluent_ml:num(d.diluentMl),dose:num(d.dose),unit:str(d.unit)||"mg",every_days:num(d.everyDays,7),weeks:num(d.weeks,4),include_instructions:d.includeInstructions?1:0,updated_at:now},query=id?cloud.from("protocols").update(values).eq("id",id):cloud.from("protocols").insert(values),{error}=await query;if(error)throw error;return json({ok:true});}
     if(action==="deleteProtocol"){const {error}=await cloud.from("protocols").delete().eq("id",num(d.id));if(error)throw error;return json({ok:true});}
     if(action==="saveSetting"){const {error}=await cloud.from("app_settings").upsert({key:str(d.key),value:str(d.value),updated_at:now},{onConflict:"key"});if(error)throw error;return json({ok:true});}
+    if(action==="saveWithdrawal"){
+      const teamId=num(d.teamId||d.teamMemberId),productId=num(d.productId),quantity=Math.max(1,Math.trunc(num(d.quantity))),member=await one("team",teamId),{data:profile}=await cloud.from("product_profiles").select("unit_cost").eq("product_id",productId).maybeSingle(),unitCost=num(profile?.unit_cost),total=unitCost*quantity,location=member?.role==="Socio"?`SOCIO:${teamId}`:member?.partner_id?`SOCIO:${member.partner_id}`:`VENDEDOR:${teamId}`,number=`SI-${Date.now()}`;const {data,error}=await cloud.from("internal_withdrawals").insert({number,type:str(d.type)||"Retiro de socio al costo",team_id:teamId,product_id:productId,quantity,unit_cost:unitCost,total_cost:total,paid:0,balance:total,status:"Pendiente",notes:str(d.notes),created_at:now}).select("id").single();if(error)throw error;await changeBalance(productId,location,-quantity);await cloud.from("inventory_movements").insert({product_id:productId,change:-quantity,reason:`${str(d.type)} ${number}`,actor_id:user.userId,created_at:now});return json({ok:true,id:data.id});
+    }
+    if(action==="payWithdrawal"){
+      const id=num(d.id||d.withdrawalId),withdrawal=await one("internal_withdrawals",id);if(!withdrawal)return json({error:"Retiro no encontrado"},404);const amount=Math.min(Math.max(0,num(d.amount)),num(withdrawal.balance)),paid=num(withdrawal.paid)+amount,balance=Math.max(0,num(withdrawal.total_cost)-paid),status=balance<=.005?"Pagado":paid>0?"Parcial":"Pendiente",source=str(d.source)||"Pago recibido";await cloud.from("internal_withdrawal_payments").insert({withdrawal_id:id,amount,method:str(d.method)||"Efectivo",source,created_at:now});await cloud.from("internal_withdrawals").update({paid,balance,status}).eq("id",id);const category=source==="Descontar de aporte"?"Retiro descontado de aporte":"Pago de retiro interno",type=source==="Descontar de aporte"?"No monetario":"Ingreso";await cloud.from("cash_movements").insert({type,category,amount,partner_id:withdrawal.team_id,notes:str(withdrawal.number),created_at:now});return json({ok:true});
+    }
+    if(action==="deleteWithdrawal"){
+      const id=num(d.id),withdrawal=await one("internal_withdrawals",id);if(!withdrawal)return json({error:"Retiro no encontrado"},404);if(num(withdrawal.paid)>.005)return json({error:"Revierte sus pagos antes de eliminarlo"},400);const member=await one("team",num(withdrawal.team_id)),location=member?.role==="Socio"?`SOCIO:${withdrawal.team_id}`:member?.partner_id?`SOCIO:${member.partner_id}`:`VENDEDOR:${withdrawal.team_id}`;await changeBalance(num(withdrawal.product_id),location,num(withdrawal.quantity));await cloud.from("internal_withdrawals").delete().eq("id",id);return json({ok:true});
+    }
     if(["createProduct","updateProduct","adjustStock","saveClient","createInvoice","updateInvoice","applyPayment","reversePayments","deleteInvoice","archive"].includes(action))return json({error:"Operación incompleta"},500);
     if(action==="createProduct"){
       const name=str(d.name),sku=str(d.sku).toUpperCase();if(!name||!sku)return json({error:"Nombre y código son obligatorios"},400);

@@ -1,0 +1,70 @@
+.product-mobile-grid > article > img {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  object-fit: cover;
+  background: #f5e5e9;
+}
+
+.inventory-locations {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.inventory-locations h3 {
+  margin: 12px 0 2px;
+  font-size: 12px;
+}
+
+.inventory-locations > button,
+.inventory-locations > p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e2e6ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #59636e;
+}
+
+.inventory-locations small,
+.withdrawal-detail small {
+  display: block;
+  color: #7e8791;
+  font-size: 8px;
+}
+
+.inventory-locations .negative {
+  color: #c3223d;
+}
+
+.mobile-form input[type="file"] {
+  height: auto;
+  padding: 11px;
+}
+
+.withdrawal-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.withdrawal-detail > p {
+  margin: 0;
+  padding: 11px;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 10px;
+}
+
+.standalone-danger {
+  min-height: 44px;
+  border: 1px solid #c3223d;
+  border-radius: 10px;
+  background: #fff;
+  color: #c3223d;
+  font-weight: 800;
+}
