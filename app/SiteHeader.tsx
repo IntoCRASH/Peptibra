@@ -9,7 +9,7 @@ export default function SiteHeader() {
       <nav aria-label="Navegación principal">
         <Link href="/products">Catálogo</Link><Link href="/#modelo">Nuestro modelo</Link><Link href="/#reportes">COAs</Link><Link href="/faq">FAQ</Link><Link href="/contact">Contacto</Link>
       </nav>
-      <LanguageSwitcher compact/><Link className="pb-login" href="/admin">Acceso privado</Link>
+      <LanguageSwitcher compact/>
     </header>
   </>;
 }

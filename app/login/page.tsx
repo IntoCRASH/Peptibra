@@ -1,0 +1,7 @@
+"use client";
+import { FormEvent, Suspense, useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import { useSearchParams } from "next/navigation";
+function LoginContent(){const [sent,setSent]=useState(false),[error,setError]=useState("");const q=useSearchParams(),next=q.get("next")||"/ptbr-mobile";async function submit(e:FormEvent){e.preventDefault();setError("");const email=String(new FormData(e.currentTarget as HTMLFormElement).get("email")||"").toLowerCase();if(email!=="cruzmonty1983@gmail.com"){setError("Esta cuenta no estÃ¡ autorizada.");return}const s=createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);const {error}=await s.auth.signInWithOtp({email,options:{emailRedirectTo:`${location.origin}/auth/callback?next=${encodeURIComponent(next)}`}});if(error)setError(error.message);else setSent(true)}return <main className="login-page"><form onSubmit={submit}><i>P</i><span>PEPTIBRA Â· ACCESO PRIVADO</span><h1>Oficina mÃ³vil</h1>{sent?<p>Revisa tu correo. Te enviamos un enlace seguro para entrar.</p>:<><label>Correo autorizado<input name="email" type="email" defaultValue="cruzmonty1983@gmail.com" required/></label><button>Enviar enlace de acceso</button></>}{error&&<p className="login-error">{error}</p>}</form></main>}
+export default function Login(){return <Suspense fallback={<main className="login-page"/>}><LoginContent/></Suspense>}
+
