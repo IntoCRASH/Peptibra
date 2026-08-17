@@ -9,6 +9,7 @@ const AUTHORIZED_EMAIL = "cruzmonty1983@gmail.com";
 
 function LoginContent() {
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const query = useSearchParams();
   const next = query.get("next") || "/ptbr-mobile";
@@ -38,6 +39,24 @@ function LoginContent() {
     window.location.assign(next);
   }
 
+  async function recover() {
+    setError("");
+    setNotice("");
+    setLoading(true);
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(AUTHORIZED_EMAIL, { redirectTo });
+    setLoading(false);
+    if (resetError) {
+      setError("No se pudo enviar el enlace. Inténtalo nuevamente en unos minutos.");
+      return;
+    }
+    setNotice("Te enviamos un enlace seguro para crear una contraseña nueva.");
+  }
+
   return (
     <main className="login-page">
       <form onSubmit={submit}>
@@ -50,6 +69,8 @@ function LoginContent() {
         <label>Correo autorizado<input name="email" type="email" defaultValue={AUTHORIZED_EMAIL} autoComplete="username" required /></label>
         <label>Contraseña<input name="password" type="password" autoComplete="current-password" required /></label>
         <button disabled={loading}>{loading ? "Entrando…" : "Entrar"}</button>
+        <button className="login-secondary" type="button" disabled={loading} onClick={recover}>Olvidé mi contraseña</button>
+        {notice && <p className="login-notice">{notice}</p>}
         {error && <p className="login-error">{error}</p>}
       </form>
     </main>

@@ -43,7 +43,7 @@ export default function Home() {
         <p><b>FDA Disclaimer:</b> The content and products mentioned on this website have not been evaluated by the U.S. Food and Drug Administration (FDA). These products are not intended to diagnose, treat, cure, or prevent any disease. All products are sold exclusively for research, laboratory, or analytical purposes and are intended for controlled laboratory research use. The information provided is strictly for informational purposes only.</p>
         <p>All products are sold for research, laboratory, or analytical purposes only and are intended for controlled laboratory research use.</p>
         <p>Peptibra is a chemical supplier. Peptibra is not a compounding pharmacy or chemical compounding facility as defined under Section 503A of the Federal Food, Drug, and Cosmetic Act. Peptibra is not an outsourcing facility as defined under Section 503B of the Federal Food, Drug, and Cosmetic Act. The statements made within this website have not been evaluated by the U.S. Food and Drug Administration. The products we offer are not intended to diagnose, treat, cure, or prevent any disease. For laboratory in vitro experimental use only.</p>
-        <small><Link className="private-key" href="/ptbr-mobile" aria-label="Acceso privado">Copyright © 2026 Peptibra</Link></small>
+        <small>Copyright © 2026 Peptibra</small>
       </div>
     </section>
   </main>;

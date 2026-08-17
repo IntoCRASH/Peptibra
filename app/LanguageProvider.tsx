@@ -4,7 +4,7 @@ type Locale="en"|"es";
 const Context=createContext<{locale:Locale;setLocale:(v:Locale)=>void}>({locale:"en",setLocale:()=>{}});
 
 const pairs:[string,string][]=[
-  ["Catálogo","Catalog"],["Nuestro modelo","Our model"],["Contacto","Contact"],["Acceso privado","Private access"],
+  ["Catálogo","Catalog"],["Nuestro modelo","Our model"],["Contacto","Contact"],["Acceso privado","Private access"],["Acceso restringido","Restricted area"],
   ["EL LOTE COMO PUNTO DE PARTIDA","BUILT AROUND THE BATCH"],["Un hub especializado","A specialized hub"],["en péptidos de investigación.","for research peptides."],
   ["Descubre una selección respaldada por información de lote, documentación analítica y una visión clara de la disponibilidad.","Explore a curated selection supported by batch information, analytical documentation, and clear availability status."],
   ["Explorar catálogo →","Explore catalog →"],["Explorar catálogo","Explore catalog"],["Consultar COAs","View COAs"],["Conoce","Learn"],["cómo funciona nuestro modelo","how our model works"],["o revisa las","or review the"],["preguntas frecuentes","frequently asked questions"],

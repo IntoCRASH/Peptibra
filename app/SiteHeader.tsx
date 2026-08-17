@@ -10,6 +10,7 @@ export default function SiteHeader() {
         <Link href="/products">Catálogo</Link><Link href="/#modelo">Nuestro modelo</Link><Link href="/#reportes">COAs</Link><Link href="/faq">FAQ</Link><Link href="/contact">Contacto</Link>
       </nav>
       <LanguageSwitcher compact/>
+      <Link className="pb-login" href="/login?next=%2Fptbr-mobile">Acceso restringido</Link>
     </header>
   </>;
 }
