@@ -1,4 +1,4 @@
-import { createSupabaseServer } from "@/lib/supabase/server";
+import { destroySession } from "@/lib/cloudflare/auth";
 import { NextResponse } from "next/server";
-export async function GET(request:Request){const s=await createSupabaseServer();await s.auth.signOut();return NextResponse.redirect(new URL("/",request.url))}
+export async function GET(request:Request){await destroySession();return NextResponse.redirect(new URL("/",request.url))}
 

@@ -1,0 +1,27 @@
+.family-price-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin-top: 12px;
+}
+.price-grid .available-presentations{display:block;margin:4px 0 10px;color:#4f5862;font-size:10px;line-height:1.4}.price-grid article>div>span{display:block;margin-top:8px;color:#717983;font-size:10px;font-weight:700}
+.price-grid .family-price-list strong {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 7px;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: #f8eef1;
+  color: #a51537;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.price-grid .family-price-list strong span {
+  margin: 0;
+  color: #3e4650;
+  font-size: 10px;
+  font-weight: 800;
+}
+@media(max-width:600px){.family-price-list{grid-template-columns:1fr}}

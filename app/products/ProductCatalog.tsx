@@ -1,39 +1,16 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { products } from "../productData";
-
+import {useEffect,useMemo,useState} from "react";
+import {products as editorial} from "../productData";
+import {useLanguage} from "../LanguageProvider";
+type Variant={id:number;name:string;concentration:string;price:number;stock:number;description?:string;photoKey?:string;category?:string};type CartLine=Variant&{quantity:number};
+const norm=(v:string)=>v.toLowerCase().replace(/[^a-z0-9]/g,"");
 export default function ProductCatalog(){
-  const [query,setQuery]=useState("");
-  const [category,setCategory]=useState("Todos");
-  const [availability,setAvailability]=useState("Todos");
-  const [sort,setSort]=useState("featured");
-  const categories=["Todos",...Array.from(new Set(products.map(p=>p.category)))];
-  const visible=useMemo(()=>{
-    const filtered=products.filter(p=>{
-      const term=query.toLowerCase().trim();
-      const matchesText=`${p.name} ${p.dose} ${p.category} ${p.format}`.toLowerCase().includes(term);
-      const matchesCategory=category==="Todos"||p.category===category;
-      const matchesAvailability=availability==="Todos"||p.status===availability;
-      return matchesText&&matchesCategory&&matchesAvailability;
-    });
-    return [...filtered].sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="dose"?parseInt(a.dose)-parseInt(b.dose):0);
-  },[query,category,availability,sort]);
-  const reset=()=>{setQuery("");setCategory("Todos");setAvailability("Todos");setSort("featured")};
-  return <>
-    <div className="pb-catalog-panel">
-      <label className="pb-catalog-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} type="search" placeholder="Buscar producto, categoría o presentación..." aria-label="Buscar productos"/></label>
-      <div className="pb-catalog-selects">
-        <label>Disponibilidad<select value={availability} onChange={e=>setAvailability(e.target.value)}><option value="Todos">Todos</option><option value="Backordered">Backordered</option></select></label>
-        <label>Ordenar<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Selección Peptibra</option><option value="name">Nombre A–Z</option><option value="dose">Presentación</option></select></label>
-      </div>
-      <div className="pb-category-tabs" aria-label="Filtrar por categoría">{categories.map(c=><button type="button" className={category===c?"active":""} onClick={()=>setCategory(c)} key={c}>{c}</button>)}</div>
-    </div>
-    <div className="pb-shop-tools"><span><b>{visible.length}</b> {visible.length===1?"producto":"productos"}</span><button type="button" onClick={reset}>Restablecer filtros</button></div>
-    {visible.length?<div className="pb-product-grid">{visible.map((p)=><article className="pb-product-card" key={p.slug}>
-      <Link className="pb-product-image" href={`/products/${p.slug}`} aria-label={`Ver ficha de ${p.name}`}><span>{p.status}</span><Image src={p.image} width={1254} height={1254} alt={`Vial Peptibra ${p.name} ${p.dose}`} unoptimized/></Link>
-      <div className="pb-product-body"><small>{p.category}</small><h2><Link href={`/products/${p.slug}`}>{p.name}</Link></h2><p>{p.dose} · {p.format}</p><div className="pb-card-meta"><span className={p.coaStatus.includes("disponible")?"ready":"review"}>{p.coaStatus}</span><span>Tapa {p.cap}</span></div><div className="pb-card-actions"><Link href={`/products/${p.slug}`}>Ver ficha →</Link><a href={`mailto:peptibra@gmail.com?subject=${encodeURIComponent(`Consulta sobre ${p.name} ${p.dose}`)}`}>Consultar</a></div></div>
-    </article>)}</div>:<div className="pb-empty"><b>No encontramos coincidencias.</b><span>Prueba otra búsqueda o restablece los filtros.</span><button type="button" onClick={reset}>Ver todo el catálogo</button></div>}
-  </>;
+ const {locale}=useLanguage(),es=locale==="es";const [query,setQuery]=useState(""),[category,setCategory]=useState("Todos"),[sort,setSort]=useState("featured"),[variants,setVariants]=useState<Variant[]>([]),[loaded,setLoaded]=useState(false),[cart,setCart]=useState<CartLine[]>([]),[open,setOpen]=useState(false);
+ useEffect(()=>{fetch("/api/catalog").then(r=>r.json()).then(j=>{setVariants(j.products||[]);setLoaded(true)}).catch(()=>setLoaded(true));try{setCart(JSON.parse(localStorage.getItem("peptibra_cart")||"[]"))}catch{}},[]);useEffect(()=>{localStorage.setItem("peptibra_cart",JSON.stringify(cart))},[cart]);
+ const families=useMemo(()=>{const names=[...new Set(variants.map(v=>v.name))];return names.map(name=>{const live=variants.filter(v=>v.name===name),fallback=editorial.find(p=>norm(p.name)===norm(name));return{name,slug:fallback?.slug||"",image:live.find(v=>v.photoKey)?.photoKey?`/api/catalog/image?key=${encodeURIComponent(live.find(v=>v.photoKey)!.photoKey!)}`:(fallback?.image||"/peptibra-logo-original.png"),category:live[0]?.category||fallback?.category||"Péptido",format:fallback?.format||(es?"Producto de investigación":"Research product"),description:live.find(v=>v.description)?.description||fallback?.summary||"",variants:live}})},[variants,es]);const categories=["Todos",...Array.from(new Set(families.map(p=>p.category)))];const visible=useMemo(()=>families.filter(p=>`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase())&&(category==="Todos"||p.category===category)).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):0),[families,query,category,sort]);
+ const add=(p:Variant)=>{setCart(c=>{const hit=c.some(x=>x.id===p.id);return hit?c.map(x=>x.id===p.id?{...x,quantity:x.quantity+1}:x):[...c,{...p,quantity:1}]});setOpen(true)};const total=cart.reduce((s,x)=>s+x.price*x.quantity,0),count=cart.reduce((s,x)=>s+x.quantity,0);
+ const whatsapp=()=>{const lines=cart.map(x=>`• ${x.quantity} × ${x.name} ${x.concentration} — US$${(x.price*x.quantity).toFixed(2)}`),msg=es?`Hola Peptibra, deseo solicitar:\n\n${lines.join("\n")}\n\nTotal estimado: US$${total.toFixed(2)}\n\nDatos de entrega:\nNombre:\nTeléfono:\nDirección:\n\nPor favor indíquenme las formas de pago disponibles.`:`Hello Peptibra, I would like to request:\n\n${lines.join("\n")}\n\nEstimated total: US$${total.toFixed(2)}\n\nDelivery details:\nName:\nPhone:\nAddress:\n\nPlease send me the available payment methods.`;window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank")};
+ return <><button className="pb-cart-fab" onClick={()=>setOpen(true)}>🛒 {es?"Carrito":"Cart"} <b>{count}</b></button><div className="pb-catalog-panel"><label className="pb-catalog-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} type="search" placeholder="Buscar producto, categoría o presentación..."/></label><div className="pb-catalog-selects"><label>Ordenar<select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Selección Peptibra</option><option value="name">Nombre A–Z</option></select></label></div><div className="pb-category-tabs">{categories.map(c=><button className={category===c?"active":""} onClick={()=>setCategory(c)} key={c}>{c}</button>)}</div></div><div className="pb-shop-tools"><span><b>{visible.length}</b> productos</span></div>{!loaded?<div className="pb-empty">{es?"Cargando catálogo…":"Loading catalog…"}</div>:<div className="pb-product-grid">{visible.map(p=><article className="pb-product-card" key={p.name}><div className="pb-product-image"><Image src={p.image} width={1254} height={1254} alt={p.name} unoptimized/></div><div className="pb-product-body"><small>{p.category}</small><h2>{p.name}</h2><p>{p.description||p.format}</p><div className="pb-variant-list">{p.variants.map(v=><button key={v.id} disabled={!v.price||v.stock<=0} onClick={()=>add(v)}><span>{v.concentration}</span><b>{v.price?`US$${v.price.toFixed(2)}`:"—"}</b><small>{v.stock>0?(es?"Añadir":"Add"):(es?"Agotado":"Sold out")}</small></button>)}</div>{p.slug&&<Link href={`/products/${p.slug}`}>Ver ficha →</Link>}</div></article>)}</div>}{open&&<div className="pb-cart-backdrop" onClick={()=>setOpen(false)}><aside className="pb-cart" onClick={e=>e.stopPropagation()}><header><div><small>PEPTIBRA</small><h2>{es?"Tu carrito":"Your cart"}</h2></div><button onClick={()=>setOpen(false)}>×</button></header>{cart.length?<><div className="pb-cart-lines">{cart.map(x=><div key={x.id}><span><b>{x.name}</b><small>{x.concentration} · US${x.price.toFixed(2)}</small></span><label><button onClick={()=>setCart(c=>c.map(y=>y.id===x.id?{...y,quantity:Math.max(1,y.quantity-1)}:y))}>−</button>{x.quantity}<button onClick={()=>setCart(c=>c.map(y=>y.id===x.id?{...y,quantity:y.quantity+1}:y))}>+</button></label><button onClick={()=>setCart(c=>c.filter(y=>y.id!==x.id))}>×</button></div>)}</div><div className="pb-cart-total"><span>Total</span><b>US${total.toFixed(2)}</b></div><button className="pb-whatsapp" onClick={whatsapp}>{es?"Continuar por WhatsApp":"Continue on WhatsApp"}</button><small className="pb-cart-note">{es?"La disponibilidad y la forma de pago se confirman en la conversación.":"Availability and payment method are confirmed in the conversation."}</small></>:<p className="pb-cart-empty">{es?"Tu carrito está vacío.":"Your cart is empty."}</p>}</aside></div>}</>;
 }

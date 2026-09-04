@@ -1,2 +1,36 @@
-"use client";import Image from "next/image";import {useEffect,useState} from "react";type Row=Record<string,unknown>;const money=(x:unknown)=>`$${Number(x||0).toFixed(2)}`;
-export default function PriceList(){const [products,setProducts]=useState<Row[]>([]);useEffect(()=>{fetch("/api/mobile").then(r=>r.json()).then(x=>setProducts(x.products||[]))},[]);const base=process.env.NEXT_PUBLIC_SUPABASE_URL;return <main className="invoice-print-page"><div className="print-toolbar"><button onClick={()=>window.print()}>Imprimir</button><button onClick={()=>window.print()}>Guardar PDF</button><button onClick={()=>navigator.share?.({title:"Lista de precios Peptibra",url:location.href})}>Compartir</button></div><article className="invoice-sheet price-sheet"><header><Image src="/peptibra-logo-original.png" width={1774} height={887} alt="Peptibra" priority/><div><span>CATÁLOGO</span><b>Lista de precios</b><small>Actualizada {new Date().toLocaleDateString("es-DO")}</small></div></header><p className="document-disclaimer"><b>IMPORTANTE:</b> PEPTIBRA Peptide Depot™ es un hub digital independiente que canaliza el acceso a péptidos y compuestos exclusivamente para fines de investigación. No somos fabricantes ni laboratorio clínico o farmacéutico.</p><section className="price-grid">{products.map(p=><article key={String(p.id)}>{p.photo_key?<img src={`${base}/storage/v1/object/public/product-images/${p.photo_key}`} alt=""/>:<i>{String(p.name).slice(0,2)}</i>}<div><b>{String(p.name)}</b><span>{String(p.concentration)}</span><p>{String(p.description||"")}</p><strong>{money(p.normal_price||p.price)}</strong>{Number(p.bac_price)>0&&<small>+ Agua BAC incluida: {money(p.bac_price)}</small>}</div></article>)}</section><footer><span>peptibra.com</span></footer></article></main>}
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import "./price-list.css";
+import { CorporateFooter, CorporateHeader, PrintToolbar } from "../print-shared";
+
+type Row = Record<string, unknown>;
+const money = (value: unknown) => `US$${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const mgOf = (value: unknown) => Number(String(value || "").match(/(?:^|\D)(5|10|15|20|30|40|50|100)\s*mg\b/i)?.[1] || 0);
+
+export default function PriceList() {
+  const [products, setProducts] = useState<Row[]>([]);
+  useEffect(() => { fetch("/api/mobile").then(response => response.json()).then(data => setProducts(data.products || [])); }, []);
+  const families = useMemo(() => {
+    const grouped = new Map<string, { name: string; description: string; photo: string; prices: { mg: number; label: string; price: number }[] }>();
+    for (const product of products) {
+      const key = String(product.name || "").trim().toLowerCase();
+      const family = grouped.get(key) || { name: String(product.name || ""), description: "", photo: "", prices: [] };
+      family.description ||= String(product.description || "");
+      family.photo ||= String(product.photo_key || "");
+      const price = Number(product.normal_price || product.price || 0), mg = mgOf(product.concentration);
+      if (price > 0) family.prices.push({ mg, label: mg ? `${mg} mg` : String(product.concentration || "Presentación"), price });
+      grouped.set(key, family);
+    }
+    return [...grouped.values()].map(family => ({ ...family, prices: family.prices.sort((a, b) => (a.mg || 9999) - (b.mg || 9999)) })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [products]);
+  const base = process.env.NEXT_PUBLIC_PEPTIBRA_FILES_URL || "https://peptibra-api.peptibra-management.workers.dev/files";
+  return <main className="print-document">
+    <PrintToolbar title="Lista de precios Peptibra"/>
+    <article className="canonical-sheet price-sheet">
+      <CorporateHeader kicker="" title="LISTA DE PRECIOS" detail={`Actualizada: ${new Date().toLocaleDateString("es-DO")}`}/>
+      <section className="price-grid">{families.map(family => <article key={family.name}>{family.photo ? <img src={`${base}/${encodeURIComponent(family.photo)}`} alt=""/> : <i>{family.name.slice(0, 2)}</i>}<div><b>{family.name}</b><p>{family.description || "Sin descripción disponible."}</p><span>Presentaciones disponibles</span><small className="available-presentations">{family.prices.map(price => price.label).join(", ")}</small><span>Precios por mg disponibles.</span><div className="family-price-list">{family.prices.map(price => <strong key={price.label}><span>{price.label}</span>{money(price.price)}</strong>)}</div></div></article>)}</section>
+      <CorporateFooter left="PEPTIBRA - Página 1 de 1"/>
+    </article>
+  </main>;
+}

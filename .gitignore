@@ -40,3 +40,8 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/tmp/
+*.tsbuildinfo
+/cloudflare/bootstrap-admin.sql
+/cloudflare/migration.sql
+/cloudflare/migration-summary.json

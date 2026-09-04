@@ -1,0 +1,3 @@
+import { hashPassword, userFromBearer } from "@/lib/cloudflare/auth";
+import { d1 } from "@/lib/cloudflare/d1";
+export async function PUT(request:Request){const user=await userFromBearer(request);if(!user)return Response.json({error:"No autorizado"},{status:401});const body=await request.json() as {password?:string},password=String(body.password||"");if(password.length<10)return Response.json({error:"La contraseña debe tener al menos 10 caracteres"},{status:400});await d1.prepare("UPDATE auth_users SET password_hash=?,must_change_password=0,updated_at=? WHERE id=?").bind(await hashPassword(password),new Date().toISOString(),user.id).run();return Response.json({id:user.id});}

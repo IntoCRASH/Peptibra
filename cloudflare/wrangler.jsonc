@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "peptibra-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "peptibra-production",
+    "database_id": "3bc963c7-9e39-4d47-b300-460e17cf8688"
+  }],
+  "r2_buckets": [{
+    "binding": "FILES",
+    "bucket_name": "peptibra"
+  }]
+}
