@@ -7,7 +7,7 @@ import HomeCatalog from "./HomeCatalog";
 export default function Home(){return <main className="pb-site pb-public-new"><VerificationGate/><SiteHeader/>
   <section className="new-hero">
     <div><span className="new-eyebrow">PEPTIBRA · PEPTIDE DEPOT</span><h1>Research,<br/><em>clearly presented.</em></h1><p>Productos de investigación, presentaciones disponibles y documentación por lote.</p><div className="new-actions"><Link href="/products">Ver catálogo</Link><Link href="/coas">Consultar COAs</Link></div></div>
-    <div className="new-hero-mark"><Image src="/peptibra-isotipo.png" width={700} height={700} alt="Peptibra" priority/><span>PEPTIBRA</span><b>Peptide Depot</b></div>
+    <div className="new-hero-mark"><Image src="/editorial/peptibra-ghk-bac-studio.png" width={1536} height={1024} alt="Peptibra GHK-CU y BAC Water" priority/></div>
   </section>
   <section className="new-catalog-preview" id="catalogo"><header><div><span>SELECCIÓN PEPTIBRA</span><h2>Productos disponibles.</h2></div><Link href="/products">Explorar todo →</Link></header><HomeCatalog/></section>
   <section className="new-coa-strip" id="coas"><div><span>DOCUMENTACIÓN</span><h2>COAs organizados por producto y lote.</h2></div><p>Consulta el estado de la documentación disponible y solicita el reporte correspondiente al lote de interés.</p><Link href="/coas">Abrir centro de COAs →</Link></section>

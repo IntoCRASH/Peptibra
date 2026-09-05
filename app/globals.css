@@ -133,6 +133,18 @@ footer p,footer .shell>span{color:#777}
 @media(max-width:900px){.new-hero{grid-template-columns:1fr;min-height:auto}.new-hero-mark{width:min(420px,80vw)}.new-catalog-preview .pb-mini-grid{grid-template-columns:repeat(2,1fr)}.new-coa-strip{grid-template-columns:1fr}.new-shop .pb-product-grid{grid-template-columns:repeat(2,1fr)}.new-footer{grid-template-columns:1fr}.new-coa-list article{grid-template-columns:40px 1fr}.new-coa-list article>span,.new-coa-list article>a{grid-column:2}}
 @media(max-width:560px){.new-hero{padding-top:55px}.new-actions{flex-direction:column}.new-catalog-preview .pb-mini-grid,.new-shop .pb-product-grid{grid-template-columns:1fr}.new-catalog-preview header{align-items:start;gap:20px;flex-direction:column}.new-footer nav{flex-wrap:wrap}.new-faq-list summary{grid-template-columns:38px 1fr auto;font-size:17px}.new-faq-list details p{margin-left:38px}}
 
+/* Editorial product photography */
+.new-hero-mark{width:min(440px,40vw);padding:0;overflow:hidden;background:#f2e8eb}
+.new-hero-mark img{width:100%;height:100%;object-fit:cover;object-position:61% center;opacity:.82;filter:saturate(.82) contrast(.96)}
+.new-hero-mark span,.new-hero-mark b{display:none}
+.products-head,.coa-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,36vw);align-items:center;gap:7vw;overflow:hidden}
+.products-head>img,.coa-head>img{width:100%;height:260px;object-fit:cover}
+.products-head>img{object-position:37% 48%;border-radius:50% 0 0 50%}
+.coa-head{background:#17191c;color:#fff}
+.coa-head>img{object-position:center 57%;filter:saturate(.82)}
+.coa-head p{color:#b7bbc0}.coa-head>div>span{color:#d67b91}
+@media(max-width:900px){.new-hero-mark{width:min(420px,80vw)}.products-head,.coa-head{grid-template-columns:1fr}.products-head>img,.coa-head>img{height:220px;border-radius:0}}
+
 /* Réplica métrica de las plantillas Windows: 1240 × 1754 px a 150 ppp. */
 .canonical-sheet{padding:12.19mm}.corporate-logo{height:20.3mm}.corporate-logo img{height:auto;max-width:48.3mm;max-height:16.1mm}.corporate-rule{height:.34mm}.corporate-disclaimer{height:auto;min-height:18mm;margin:2.7mm 0 3.4mm;font-size:7.2pt;line-height:1.28}.corporate-title{min-height:11.85mm}.corporate-title h1{margin:1mm 0 0;font-size:20.16pt;line-height:1}.corporate-title small{font-size:6.72pt}.corporate-title>strong{font-size:10.56pt;margin-bottom:1.5mm}.corporate-accent{height:.85mm;margin:3.4mm 0 4.7mm}.corporate-footer{left:12.19mm;right:12.19mm;bottom:8.45mm;font-size:6.72pt!important}.corporate-footer img{width:10.84mm;height:10.84mm}
 .invoice-party-card{grid-template-columns:1fr 1fr;gap:15mm;height:29.63mm;min-height:0;border-radius:3.4mm;padding:3.4mm 4.1mm;margin-bottom:5.1mm;box-sizing:border-box}.invoice-party-card small{font-size:6.72pt}.invoice-party-card h2{font-size:10.56pt;margin:1.7mm 0}.invoice-party-card p,.invoice-party-card b{font-size:8.64pt;margin:1.2mm 0}.invoice-party-card em{font-size:6.72pt;margin:.8mm 0}.canonical-table{border-spacing:0 1.69mm;font-size:8.64pt;table-layout:fixed}.canonical-table th{height:9.14mm;padding:0 2.37mm;font-size:6.72pt}.canonical-table th:first-child{width:39.3%}.canonical-table th:nth-child(2){width:8%}.canonical-table th:nth-child(3){width:15%}.canonical-table th:nth-child(4){width:13%}.canonical-table th:nth-child(5){width:24.7%}.canonical-table td{height:13.88mm;padding:0 2.37mm}.invoice-bottom{grid-template-columns:1fr 89.7mm;gap:5.9mm;margin-top:2.5mm}.invoice-bottom>div{font-size:8.64pt}.invoice-bottom aside{height:45.7mm;border-radius:3.4mm;padding:2mm 3.7mm;box-sizing:border-box}.invoice-bottom aside p{margin:1.5mm 0}.invoice-bottom aside span{font-size:6.72pt}.invoice-bottom aside b{font-size:10.56pt}
