@@ -6,8 +6,9 @@ import {useLanguage} from "../LanguageProvider";
 type Variant={id:number;name:string;concentration:string;price:number;stock:number;description?:string;photoKey?:string;category?:string};
 type CartLine=Variant&{quantity:number};
 const unavailable="/product-image-unavailable.png";
-const categoriesEn:Record<string,string>={"Péptido":"Peptide","Accesorio":"Accessory"};
+const categoriesEn:Record<string,string>={"Péptido":"Peptide","Accesorio":"Accessory","Agua bacteriostática":"Bacteriostatic water"};
 const categoryEn=(value:string)=>categoriesEn[value]||value;
+const presentationEn=(value:string)=>value.replace(/\bviales?\b/gi,"vials");
 
 export default function ProductCatalog(){
  const {locale}=useLanguage(),es=locale==="es";
