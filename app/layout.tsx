@@ -6,7 +6,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://peptibra.com"),
   title: "Peptibra · Research catalog",
   description: "Catálogo conectado de productos de investigación y documentación por lote.",
-  icons: { icon: "/favicon.svg" },
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/favicon.svg", apple: "/apple-icon.png" },
+  appleWebApp: { capable: true, title: "Peptibra", statusBarStyle: "default" },
   openGraph: { title: "Peptibra · Peptide Depot", description: "Research without limits.", images: ["/og.png"] },
   twitter: { card: "summary_large_image", title: "Peptibra · Peptide Depot", description: "Research without limits.", images: ["/og.png"] },
 };
