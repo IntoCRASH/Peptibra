@@ -25,7 +25,8 @@ export async function GET() {
   const suppliers=supplierRows.filter(x=>Number(x.active)===1);
   const purchases=purchaseRows.map(x=>({...x,supplier_name:supplierMap.get(Number(x.supplier_id))?.name,partner_name:teamMap.get(Number(x.partner_id))?.name??null}));
   const withdrawals=internalWithdrawals.map(x=>({...x,team_member_id:x.team_id}));
-  let visibleTeam=team,visibleBalances=balances,visibleMovements=inventoryMovements,visibleItems=invoiceItems,visiblePayments=payments,visibleCash=cash,visibleSuppliers=suppliers,visiblePurchases=purchases,visibleCalculations=calculations,visibleProtocols=protocols,visibleWithdrawals=withdrawals,visibleWithdrawalPayments=withdrawalPayments,visibleSettings=settings;
+  let visibleTeam=team,visibleBalances=balances,visibleMovements=inventoryMovements,visibleItems=invoiceItems,visiblePayments=payments,visibleCash=cash,visibleSuppliers=suppliers,visiblePurchases=purchases,visibleCalculations=calculations,visibleWithdrawals=withdrawals,visibleWithdrawalPayments=withdrawalPayments,visibleSettings=settings;
+  const visibleProtocols=protocols;
   if(user.role!=="admin"){
     // Cada cuenta ve únicamente su operación personal. La relación vendedor-socio
     // sirve para propiedad financiera, no para mezclar paneles ni inventarios.

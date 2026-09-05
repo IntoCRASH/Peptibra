@@ -3,6 +3,7 @@ import { d1 } from "./d1";
 type Row = Record<string, unknown>;
 // La forma dinámica replica PostgREST; `any` mantiene compatibilidad con las rutas
 // existentes mientras D1 valida nombres y parámetros antes de ejecutar SQL.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- PostgREST compatibility intentionally permits every row/result shape.
 type Result = { data: any; error: { message: string } | null; count?: number | null };
 const ident = (value: string) => { if (!/^[a-z_][a-z0-9_]*$/i.test(value)) throw new Error("Identificador SQL inválido"); return `"${value}"`; };
 

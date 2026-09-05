@@ -16,8 +16,7 @@ export default function VerificationGate() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY) === "accepted";
-    setVerified(saved);
-    setReady(true);
+    queueMicrotask(() => { setVerified(saved); setReady(true); });
   }, []);
 
   useEffect(() => {
