@@ -134,8 +134,9 @@ footer p,footer .shell>span{color:#777}
 @media(max-width:560px){.new-hero{padding-top:55px}.new-actions{flex-direction:column}.new-catalog-preview .pb-mini-grid,.new-shop .pb-product-grid{grid-template-columns:1fr}.new-catalog-preview header{align-items:start;gap:20px;flex-direction:column}.new-footer nav{flex-wrap:wrap}.new-faq-list summary{grid-template-columns:38px 1fr auto;font-size:17px}.new-faq-list details p{margin-left:38px}}
 
 /* Editorial product photography */
-.new-hero-mark{width:min(440px,40vw);padding:0;overflow:hidden;background:#f2e8eb}
-.new-hero-mark img{width:100%;height:100%;object-fit:cover;object-position:61% center;opacity:.82;filter:saturate(.82) contrast(.96)}
+.new-hero-mark{width:min(540px,43vw);aspect-ratio:3/2;padding:0;overflow:hidden;background:#f2e8eb;border-radius:0}
+.new-hero-mark:after{display:none}
+.new-hero-mark img{width:100%;height:100%;object-fit:cover;object-position:61% center;opacity:.88;filter:saturate(.82) contrast(.96)}
 .new-hero-mark span,.new-hero-mark b{display:none}
 html[lang="es"] .new-hero h1{font-size:clamp(48px,6.7vw,96px);letter-spacing:-.06em}
 .products-head,.coa-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,36vw);align-items:center;gap:7vw;overflow:hidden}
@@ -144,7 +145,8 @@ html[lang="es"] .new-hero h1{font-size:clamp(48px,6.7vw,96px);letter-spacing:-.0
 .coa-head{background:#17191c;color:#fff}
 .coa-head>img{object-position:center 57%;filter:saturate(.82)}
 .coa-head p{color:#b7bbc0}.coa-head>div>span{color:#d67b91}
-@media(max-width:900px){.new-hero-mark{width:min(420px,80vw)}.products-head,.coa-head{grid-template-columns:1fr}.products-head>img,.coa-head>img{height:220px;border-radius:0}}
+@media(max-width:900px){.new-hero-mark{width:100%;max-width:680px}.products-head,.coa-head{grid-template-columns:1fr}.products-head>img,.coa-head>img{height:220px;border-radius:0}}
+@media(max-width:620px){.pb-header{grid-template-columns:150px 72px minmax(92px,1fr);gap:6px;padding-inline:10px}.pb-logo{width:150px;height:60px;overflow:visible}.pb-logo img{position:static;width:150px;height:60px;object-fit:contain}.pb-header>.pb-login{font-size:8px;padding:9px 6px}.new-hero-mark{aspect-ratio:3/2}}
 
 /* Réplica métrica de las plantillas Windows: 1240 × 1754 px a 150 ppp. */
 .canonical-sheet{padding:12.19mm}.corporate-logo{height:20.3mm}.corporate-logo img{height:auto;max-width:48.3mm;max-height:16.1mm}.corporate-rule{height:.34mm}.corporate-disclaimer{height:auto;min-height:18mm;margin:2.7mm 0 3.4mm;font-size:7.2pt;line-height:1.28}.corporate-title{min-height:11.85mm}.corporate-title h1{margin:1mm 0 0;font-size:20.16pt;line-height:1}.corporate-title small{font-size:6.72pt}.corporate-title>strong{font-size:10.56pt;margin-bottom:1.5mm}.corporate-accent{height:.85mm;margin:3.4mm 0 4.7mm}.corporate-footer{left:12.19mm;right:12.19mm;bottom:8.45mm;font-size:6.72pt!important}.corporate-footer img{width:10.84mm;height:10.84mm}
