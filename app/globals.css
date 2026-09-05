@@ -137,6 +137,7 @@ footer p,footer .shell>span{color:#777}
 .new-hero-mark{width:min(440px,40vw);padding:0;overflow:hidden;background:#f2e8eb}
 .new-hero-mark img{width:100%;height:100%;object-fit:cover;object-position:61% center;opacity:.82;filter:saturate(.82) contrast(.96)}
 .new-hero-mark span,.new-hero-mark b{display:none}
+html[lang="es"] .new-hero h1{font-size:clamp(48px,6.7vw,96px);letter-spacing:-.06em}
 .products-head,.coa-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,36vw);align-items:center;gap:7vw;overflow:hidden}
 .products-head>img,.coa-head>img{width:100%;height:260px;object-fit:cover}
 .products-head>img{object-position:37% 48%;border-radius:50% 0 0 50%}
