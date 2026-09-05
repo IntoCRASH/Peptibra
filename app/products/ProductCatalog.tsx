@@ -2,6 +2,7 @@
 import Image from "next/image";
 import {useEffect,useMemo,useState} from "react";
 import {useLanguage} from "../LanguageProvider";
+import {products as editorial} from "../productData";
 
 type Variant={id:number;name:string;concentration:string;price:number;stock:number;description?:string;photoKey?:string;category?:string};
 type CartLine=Variant&{quantity:number};
@@ -9,6 +10,8 @@ const unavailable="/product-image-unavailable.png";
 const categoriesEn:Record<string,string>={"Péptido":"Peptide","Accesorio":"Accessory","Agua bacteriostática":"Bacteriostatic water"};
 const categoryEn=(value:string)=>categoriesEn[value]||value;
 const presentationEn=(value:string)=>value.replace(/\bviales?\b/gi,"vials");
+const aliases:Record<string,string>={"Dual Receptor Agonist":"tirzepatide","Triple Receptor Agonist":"glp3-reta"};
+const historicalPhoto=(name:string)=>editorial.find(p=>p.slug===(aliases[name]||"")||p.name.toLowerCase()===name.toLowerCase())?.image||unavailable;
 
 export default function ProductCatalog(){
  const {locale}=useLanguage(),es=locale==="es";
@@ -16,7 +19,7 @@ export default function ProductCatalog(){
  useEffect(()=>{fetch("/api/catalog").then(r=>r.json()).then(j=>{setVariants(j.products||[]);setLoaded(true)}).catch(()=>setLoaded(true));try{setCart(JSON.parse(localStorage.getItem("peptibra_cart")||"[]"))}catch{}},[]);
  useEffect(()=>{localStorage.setItem("peptibra_cart",JSON.stringify(cart))},[cart]);
  useEffect(()=>{if(es)return;const texts=[...new Set(variants.map(v=>v.description?.trim()).filter(Boolean))] as string[];if(!texts.length)return;fetch("/api/catalog/translate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({texts})}).then(r=>r.json()).then(j=>setTranslations(j.translations||{})).catch(()=>{})},[es,variants]);
- const families=useMemo(()=>{const names=[...new Set(variants.map(v=>v.name))];return names.map(name=>{const live=variants.filter(v=>v.name===name),key=live.find(v=>v.photoKey)?.photoKey,description=live.find(v=>v.description)?.description?.trim()||"";return{name,image:key?`/api/catalog/image?key=${encodeURIComponent(key)}`:unavailable,category:live[0]?.category||"Péptido",description,variants:live}})},[variants]);
+ const families=useMemo(()=>{const names=[...new Set(variants.map(v=>v.name))];return names.map(name=>{const live=variants.filter(v=>v.name===name),key=live.find(v=>v.photoKey)?.photoKey,description=live.find(v=>v.description)?.description?.trim()||"";return{name,image:key?`/api/catalog/image?key=${encodeURIComponent(key)}`:historicalPhoto(name),fallback:historicalPhoto(name),category:live[0]?.category||"Péptido",description,variants:live}})},[variants]);
  const categories=[...new Set(families.map(p=>p.category))],visible=useMemo(()=>families.filter(p=>`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase())&&(category==="__all"||p.category===category)).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):0),[families,query,category,sort]);
  const add=(p:Variant)=>{setCart(c=>c.some(x=>x.id===p.id)?c.map(x=>x.id===p.id?{...x,quantity:x.quantity+1}:x):[...c,{...p,quantity:1}]);setOpen(true)};
  const total=cart.reduce((s,x)=>s+x.price*x.quantity,0),count=cart.reduce((s,x)=>s+x.quantity,0);
