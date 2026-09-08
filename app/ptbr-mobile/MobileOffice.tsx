@@ -95,6 +95,7 @@ export default function MobileOffice({
         .reduce((s, x) => s + Number(x.quantity || 0), 0),
     cashTotal = Number(snapshot.cash || 0),
     pending = invoices.reduce((s, x) => s + Number(x.balance || 0), 0),
+    unitsSold = invoiceItems.reduce((s, item) => s + Number(item.quantity || 0), 0),
     retention = Number(snapshot.retention || 0),
     reserve = Number(snapshot.reserve || 0),
     netProfit = Number(snapshot.realizedNet || 0),
@@ -321,6 +322,7 @@ export default function MobileOffice({
             value={String(products.reduce((s, p) => s + stock(p.id), 0))}
             tone="blue"
           />
+          <Card label={isAdmin ? "Unidades vendidas" : "Mis unidades vendidas"} value={String(unitsSold)} tone="rose" />
           {!isAdmin && <>
             <Card label="Mis ventas" value={money(invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0))} tone="green" />
             <Card label="Mis comisiones" value={money(access.commissionTotal)} tone="green" />
