@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { toJpeg } from "html-to-image";
 import { useLanguage } from "../LanguageProvider";
 
 type DoseUnit = "mg" | "mL" | "u100";
@@ -20,6 +22,7 @@ export default function VialCalculator() {
   const [unit, setUnit] = useState<DoseUnit>("mg");
   const [everyDays, setEveryDays] = useState("1");
   const [weeks, setWeeks] = useState("4");
+  const protocolCard = useRef<HTMLElement>(null);
 
   const result = useMemo(() => {
     const vial = number(vialMg), water = number(waterMl), enteredDose = number(dose);
@@ -40,6 +43,16 @@ export default function VialCalculator() {
 
   const doseLabel = unit === "u100" ? (es ? "unidades U-100" : "U-100 units") : unit;
   const syringeWidth = result ? Math.min(100, result.syringeUnits) : 0;
+  const makeJpeg = async () => {
+    if (!protocolCard.current) throw new Error("Protocol card unavailable");
+    return toJpeg(protocolCard.current, { quality: .96, pixelRatio: 2, backgroundColor: "#111318", cacheBust: true });
+  };
+  const saveJpeg = async () => { const url=await makeJpeg(),a=document.createElement("a");a.href=url;a.download=`peptibra-protocolo-${vialMg}mg.jpg`;a.click(); };
+  const shareWhatsApp = async () => {
+    const url=await makeJpeg(),blob=await (await fetch(url)).blob(),file=new File([blob],"protocolo-peptibra.jpg",{type:"image/jpeg"});
+    if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){await navigator.share({title:"Protocolo Peptibra",text:es?"Mi cálculo de protocolo Peptibra":"My Peptibra protocol calculation",files:[file]});return;}
+    await saveJpeg(); window.open(`https://wa.me/?text=${encodeURIComponent((es?"Protocolo Peptibra: ":"Peptibra protocol: ")+location.href)}`,"_blank","noopener,noreferrer");
+  };
 
   return <>
     <section className="calc-head">
@@ -68,25 +81,37 @@ export default function VialCalculator() {
         </article>
       </div>
 
-      <aside className="calc-results">
-        <span>{es ? "RESULTADO" : "RESULT"}</span>
+      <div className="calc-result-column">
+      <aside className="calc-results calc-protocol-card" ref={protocolCard}>
+        <header className="calc-card-brand"><Image src="/brand/peptibra-logo-light.svg" width={980} height={270} alt="Peptibra" unoptimized priority/><span>{es ? "CALCULADORA DE DILUCIÓN" : "DILUTION CALCULATOR"}</span></header>
+        <span>{es ? "CONFIGURACIÓN DE MEZCLA" : "MIX CONFIGURATION"}</span>
         {!result ? <div className="calc-invalid">{es ? "Completa todos los campos con valores mayores que cero." : "Complete every field with values greater than zero."}</div> : <>
-          <div className="calc-primary"><small>{es ? "JERINGA U-100" : "U-100 SYRINGE"}</small><strong>{format(result.syringeUnits, 1)}</strong><b>{es ? "unidades" : "units"}</b></div>
-          <div className="calc-syringe" aria-label={`${format(result.syringeUnits, 1)} ${doseLabel}`}><i style={{ width: `${syringeWidth}%` }} /><div>{[0, 20, 40, 60, 80, 100].map(mark => <span key={mark}>{mark}</span>)}</div></div>
-          {result.syringeUnits > 100 && <p className="calc-warning">{es ? "La lectura supera la capacidad de una jeringa U-100 de 1 mL." : "This reading exceeds a standard 1 mL U-100 syringe."}</p>}
-          <div className="calc-equation"><b>{format(result.doseMg)} mg</b><span>=</span><b>{format(result.volume)} mL</b><span>=</span><b>{format(result.syringeUnits, 1)} U</b></div>
-          <dl>
-            <div><dt>{es ? "Concentración" : "Concentration"}</dt><dd>{format(result.concentration)} mg/mL</dd></div>
-            <div><dt>{es ? "Volumen por aplicación" : "Volume per application"}</dt><dd>{format(result.volume)} mL</dd></div>
-            <div><dt>{es ? "Rendimiento del vial" : "Applications per vial"}</dt><dd>{result.dosesPerVial} {es ? "aplicaciones" : "applications"}</dd></div>
-            <div><dt>{es ? "Aplicaciones del período" : "Applications in period"}</dt><dd>{result.applications}</dd></div>
-            <div><dt>{es ? "Cantidad total" : "Total amount"}</dt><dd>{format(result.totalMg)} mg</dd></div>
-            <div className="accent"><dt>{es ? "Viales necesarios" : "Vials needed"}</dt><dd>{result.vials}</dd></div>
-          </dl>
+          <div className="calc-mix-summary"><div><small>{es?"AGUA BACTERIOSTÁTICA":"BACTERIOSTATIC WATER"}</small><b>{format(number(waterMl),2)} <i>mL</i></b></div><div><small>{es?"CONTENIDO DEL VIAL":"VIAL CONTENT"}</small><b>{format(number(vialMg),2)} <i>mg</i></b></div></div>
+          <div className="calc-visual-grid">
+            <div className="calc-data-stack">
+              <span className="calc-dose-kicker">{es?"DOSIS DESEADA":"DESIRED DOSE"}</span>
+              <div className="calc-dose-display"><small>{es?"Cantidad por aplicación":"Amount per application"}</small><b>{dose} <i>{doseLabel}</i></b></div>
+              <div className="calc-primary"><small>{es ? "JERINGA U-100" : "U-100 SYRINGE"}</small><strong>{format(result.syringeUnits, 1)}</strong><b>{es ? "unidades" : "units"}</b></div>
+              {result.syringeUnits > 100 && <p className="calc-warning">{es ? "La lectura supera la capacidad de una jeringa U-100 de 1 mL." : "This reading exceeds a standard 1 mL U-100 syringe."}</p>}
+              <div className="calc-equation"><b>{format(result.doseMg)} mg</b><span>=</span><b>{format(result.volume)} mL</b><span>=</span><b>{format(result.syringeUnits, 1)} U</b></div>
+              <dl>
+                <div><dt>{es ? "Concentración" : "Concentration"}</dt><dd>{format(result.concentration)} mg/mL</dd></div>
+                <div><dt>{es ? "Volumen por aplicación" : "Volume per application"}</dt><dd>{format(result.volume)} mL</dd></div>
+                <div><dt>{es ? "Rendimiento del vial" : "Applications per vial"}</dt><dd>{result.dosesPerVial} {es ? "aplicaciones" : "applications"}</dd></div>
+                <div><dt>{es ? "Aplicaciones del período" : "Applications in period"}</dt><dd>{result.applications}</dd></div>
+                <div><dt>{es ? "Cantidad total" : "Total amount"}</dt><dd>{format(result.totalMg)} mg</dd></div>
+                <div className="accent"><dt>{es ? "Viales necesarios" : "Vials needed"}</dt><dd>{result.vials}</dd></div>
+              </dl>
+            </div>
+            <div className="calc-syringe-panel"><div className="calc-real-syringe calc-syringe-2d" role="img" aria-label={es?`Jeringa U-100 cargada a ${format(result.syringeUnits,1)} unidades`:`U-100 syringe filled to ${format(result.syringeUnits,1)} units`}><i className="syringe-needle"/><i className="syringe-hub"/><div className="syringe-barrel"><i className="calc-syringe-liquid" style={{height:`${syringeWidth}%`}}/><i className="calc-syringe-gasket" style={{top:`${syringeWidth}%`}}/></div><i className="syringe-flange"/><i className="syringe-plunger"/><i className="syringe-thumb"/><div className="calc-u100-scale" aria-hidden="true">{Array.from({length:51},(_,index)=>{const units=index*2;return <i key={units} className={units%10===0?"major":units%5===0?"medium":"minor"} style={{top:`${units}%`}}>{units%10===0?<b>{units}</b>:null}</i>})}</div><i className="calc-reading-marker" style={{top:`${82+syringeWidth*3.1}px`}}/><strong style={{top:`${68+syringeWidth*3.1}px`}}>{format(result.syringeUnits,1)} U</strong></div></div>
+          </div>
         </>}
         <p className="calc-note">{es ? "Herramienta matemática de referencia. No constituye orientación médica ni instrucciones de uso humano." : "Mathematical reference tool only. It is not medical guidance or instructions for human use."}</p>
       </aside>
+      <div className="calc-share-actions"><button onClick={saveJpeg}>{es?"Guardar JPG":"Save JPG"}</button><button onClick={shareWhatsApp}>WhatsApp</button></div>
+      </div>
     </section>
     <div className="calc-back"><Link href="/products">{es ? "Explorar productos →" : "Explore products →"}</Link></div>
   </>;
 }
+

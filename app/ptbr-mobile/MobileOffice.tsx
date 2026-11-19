@@ -1,13 +1,27 @@
+/* eslint-disable @next/next/no-img-element -- Inventory images are user-managed remote assets. */
 "use client";
 import Image from "next/image";
 import "./mobile-enhancements.css";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type Row = Record<string, unknown>;
-type View = "home" | "sales" | "inventory" | "clients" | "cash" | "protocols" | "more";
+type View = "home" | "sales" | "inventory" | "clients" | "loyalty" | "cash" | "protocols" | "more";
 const money = (v: unknown) =>
   `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const val = (form: HTMLFormElement) => Object.fromEntries(new FormData(form));
+const rowMonth = (row: Row) => String(row.created_at || row.updated_at || "").slice(0, 7);
+const currentMonthValue = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; };
+const isInvoiceOverdue = (invoice: Row) => {
+  if (Number(invoice.balance || 0) <= 0.005) return false;
+  const issued = new Date(String(invoice.created_at || ""));
+  return Number.isFinite(issued.getTime()) && Date.now() - issued.getTime() > 15 * 24 * 60 * 60 * 1000;
+};
+const isInvoicePending = (invoice: Row) => {
+  const status = String(invoice.status || "").trim().toLocaleLowerCase("es");
+  return Number(invoice.balance || 0) > 0.005 && !["pagada", "cancelada", "anulada", "eliminada"].includes(status);
+};
+const TrashIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const BellIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 
 export default function MobileOffice({
   userName,
@@ -22,9 +36,18 @@ export default function MobileOffice({
     [error, setError] = useState(""),
     [modal, setModal] = useState<string | null>(null),
     [selected, setSelected] = useState<Row | null>(null),
-    [search, setSearch] = useState("");
+    [search, setSearch] = useState(""),
+    [salesFilter, setSalesFilter] = useState<"all" | "pending">("all"),
+    [reportMonth, setReportMonth] = useState(currentMonthValue),
+    [cashRange, setCashRange] = useState<"month" | "year" | "all">("month"),
+    [cashYear, setCashYear] = useState(() => currentMonthValue().slice(0, 4)),
+    [inventoryDrafts, setInventoryDrafts] = useState<Record<number, string>>({});
+  const inventoryPending = useRef(new Map<number, number>()),
+    inventoryTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>()),
+    inventorySaving = useRef(new Map<number, Promise<void>>());
   const load = useCallback(async () => {
     setLoading(true);
+    await fetch("/api/exchange-rate").catch(() => null);
     const r = await fetch("/api/mobile");
     const j = await r.json();
     if (!r.ok) setError(j.error || "No se pudo cargar");
@@ -42,7 +65,7 @@ export default function MobileOffice({
       action === "openSettings" ||
       (action === "saveSetting" && payload.key === "last_mobile_access")
     ) {
-      window.location.href = "/ptbr-mobile/settings";
+      window.location.href = "/office/settings";
       return;
     }
     setError("");
@@ -56,48 +79,62 @@ export default function MobileOffice({
       setError(j.error || "No se pudo guardar");
       return j;
     }
-    if (action !== "touchRevision")
+    if (!["touchRevision", "createInvoice", "updateInvoice"].includes(action))
       await fetch("/api/mobile", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "touchRevision", data: {} }),
       });
     setModal(null);
+    setSelected(null);
     await load();
     return j;
   };
   const products = data.products || [],
     balances = data.balances || [],
-    inventoryMovements = data.inventoryMovements || [],
     team = data.team || [],
     clients = data.clients || [],
+    inactiveClients = data.inactiveClients || [],
     invoices = data.invoices || [],
     invoiceItems = data.invoiceItems || [],
     payments = data.payments || [],
     cash = data.cash || [],
     suppliers = data.suppliers || [],
     purchases = data.purchases || [],
-    calculations = data.calculations || [],
     protocols = data.protocols || [],
     internalWithdrawals = data.internalWithdrawals || [],
     withdrawalPayments = data.withdrawalPayments || [],
+    inventoryLots = data.inventoryLots || [],
+    loyaltyRewards = data.loyaltyRewards || [],
+    auditLog = data.auditLog || [],
     settings = data.settings || [],
+    notificationReads = ((data as unknown as { notificationReads?: string[] }).notificationReads || []),
+    notificationDismissed = ((data as unknown as { notificationDismissed?: string[] }).notificationDismissed || []),
     access = (data as unknown as { user?: Row }).user || {},
     snapshot =
       (data as unknown as { financialSnapshot?: Row }).financialSnapshot || {},
+    currentExchangeRate =
+      (data as unknown as { currentExchangeRate?: Row }).currentExchangeRate || {},
+    bacRules =
+      (data as unknown as { bacRules?: Row }).bacRules || {},
     role = String(access.role || "vendedor"),
     isAdmin = role === "admin",
     isPartner = role === "socio",
     isSeller = role === "vendedor";
+  const notificationNow=Date.now(),dayMs=24*60*60*1000,pendingNotifications=invoices.filter(isInvoicePending).map(invoice=>{const days=Math.max(0,Math.floor((notificationNow-new Date(String(invoice.created_at||"")).getTime())/dayMs));return{key:`invoice:${String(invoice.id)}`,kind:"cobro",urgent:days>15,title:days>15?"Factura vencida":"Factura pendiente de cobro",detail:`${String(invoice.number)} · ${String(invoice.client_name)} · ${money(invoice.balance)}`,meta:days>0?`Pendiente desde hace ${days} día(s)`:"Pendiente de cobro",invoice,client:null as Row|null}}),latestInvoiceByClient=new Map<number,Row>();
+  for(const invoice of invoices){const clientId=Number(invoice.client_id),current=latestInvoiceByClient.get(clientId);if(!current||new Date(String(invoice.created_at||"")).getTime()>new Date(String(current.created_at||"")).getTime())latestInvoiceByClient.set(clientId,invoice)}
+  const followupNotifications=[...latestInvoiceByClient.values()].flatMap(invoice=>{const days=Math.max(0,Math.floor((notificationNow-new Date(String(invoice.created_at||"")).getTime())/dayMs));if(days<30)return[];const names=[...new Set(invoiceItems.filter(item=>Number(item.invoice_id)===Number(invoice.id)).map(item=>String(products.find(product=>Number(product.id)===Number(item.product_id))?.name||"Producto")))],client=clients.find(item=>Number(item.id)===Number(invoice.client_id));return[{key:`followup:${String(invoice.id)}`,kind:"seguimiento",urgent:false,title:"Seguimiento de recompra",detail:`${String(invoice.client_name)} · ${names.join(", ")||"Productos adquiridos"}`,meta:`Han pasado ${days} días desde su compra`,invoice,client}]});
+  const teamSaleNotifications=isAdmin?invoices.flatMap(invoice=>{const age=notificationNow-new Date(String(invoice.created_at||"")).getTime();if(age<0||age>30*dayMs||Number(invoice.seller_id)===Number(access.inventoryTeamId))return[];const names=[...new Set(invoiceItems.filter(item=>Number(item.invoice_id)===Number(invoice.id)).map(item=>String(products.find(product=>Number(product.id)===Number(item.product_id))?.name||"Producto")))];return[{key:`team-sale:${String(invoice.id)}`,kind:"venta-equipo",urgent:false,title:`${String(invoice.seller_name||"Un integrante")} realizó una nueva venta`,detail:`${names.join(", ")||"Productos vendidos"} · ${money(invoice.total)}`,meta:`Factura ${String(invoice.number)} · ${String(invoice.client_name)}`,invoice,client:null as Row|null}]}):[];
+  const notifications=[...pendingNotifications,...teamSaleNotifications,...followupNotifications].filter(notification=>!notificationDismissed.includes(notification.key)).sort((a,b)=>Number(b.urgent)-Number(a.urgent)||a.kind.localeCompare(b.kind)),unreadNotifications=notifications.filter(notification=>!notificationReads.includes(notification.key));
+  const saveNotificationReads=async(ids:string[])=>{const unique=[...new Set(ids)];setData(current=>({...current,notificationReads:unique} as unknown as Record<string,Row[]>));await fetch("/api/mobile",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"saveNotificationReads",data:{ids:unique}})})};
+  const dismissNotification=async(key:string)=>{const unique=[...new Set([...notificationDismissed,key])];setData(current=>({...current,notificationDismissed:unique} as unknown as Record<string,Row[]>));await fetch("/api/mobile",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"saveNotificationDismissed",data:{ids:unique}})})};
+  const inventoryLocation = access.inventoryTeamId ? `VENDEDOR:${Number(access.inventoryTeamId)}` : "GENERAL";
   const stock = (id: unknown) =>
       balances
-        .filter((x) => x.product_id === id)
+        .filter((x) => x.product_id === id && String(x.location) === inventoryLocation)
         .reduce((s, x) => s + Number(x.quantity || 0), 0),
     cashTotal = Number(snapshot.cash || 0),
-    pending = invoices.reduce((s, x) => s + Number(x.balance || 0), 0),
-    unitsSold = invoiceItems.reduce((s, item) => s + Number(item.quantity || 0), 0),
     retention = Number(snapshot.retention || 0),
-    reserve = Number(snapshot.reserve || 0),
     netProfit = Number(snapshot.realizedNet || 0),
     retained = Number(snapshot.retained || 0),
     supplierDue = Number(snapshot.supplierDue || 0),
@@ -125,7 +162,8 @@ export default function MobileOffice({
             0,
           ),
       }));
-  const filtered = products.filter((p) =>
+  const alphabeticalProducts = [...products].sort((a,b)=>`${String(a.name)} ${String(a.concentration)}`.localeCompare(`${String(b.name)} ${String(b.concentration)}`,"es",{sensitivity:"base",numeric:true}));
+  const filtered = alphabeticalProducts.filter((p) =>
       `${p.name} ${p.concentration}`
         .toLowerCase()
         .includes(search.toLowerCase()),
@@ -144,21 +182,31 @@ export default function MobileOffice({
       <header className="mobile-top">
         <div className="mobile-logo">
           <Image
-            src="/peptibra-logo-original.png"
-            width={1774}
-            height={887}
+            src="/brand/peptibra-logo-dark.svg"
+            width={980}
+            height={270}
             alt="Peptibra Peptide Depot"
+            unoptimized
             priority
           />
         </div>
         <label className="flow-search">
           <span>⌕</span>
-          <input placeholder="Buscar clientes, productos, facturas…" />
+          <input
+            value={search}
+            placeholder="Buscar productos…"
+            onFocus={() => setView("inventory")}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setView("inventory");
+            }}
+          />
         </label>
         <div className="mobile-account">
+          <button className="notification-button" type="button" aria-label={`${unreadNotifications.length} notificaciones pendientes`} onClick={()=>setModal("Notificaciones")}><span><BellIcon/></span>{unreadNotifications.length>0&&<b>{unreadNotifications.length>99?"99+":unreadNotifications.length}</b>}</button>
           <span className="sync-pill">✓ Sincronizado</span>
           <b>{userName.split(" ")[0]}</b>
-          <a href="/ptbr-mobile/settings">Cambiar contraseña</a>
+          <a href="/office/settings">Cambiar contraseña</a>
           <a href={signOut}>Salir</a>
         </div>
       </header>
@@ -179,9 +227,11 @@ export default function MobileOffice({
         ) : safeView === "sales" ? (
           <Sales />
         ) : safeView === "inventory" ? (
-          <Inventory />
+          Inventory()
         ) : safeView === "clients" ? (
           <Clients />
+        ) : safeView === "loyalty" ? (
+          <Loyalty />
         ) : safeView === "cash" ? (
           <Cash />
         ) : safeView === "protocols" ? (
@@ -191,6 +241,15 @@ export default function MobileOffice({
         )}
       </section>
       <nav className={`mobile-nav role-${role}`}>
+        <div className="desktop-brand" aria-label="Peptibra">
+          <Image
+            src="/brand/peptibra-logo-light.svg"
+            width={1400}
+            height={386}
+            alt="Peptibra Peptide Depot"
+            unoptimized
+          />
+        </div>
         {(
           [
             ["home", "⌂", "Inicio"],
@@ -200,6 +259,7 @@ export default function MobileOffice({
             ["cash", "▣", "Caja"],
             ["more", "•••", "Más"],
             ["clients", "○", "Clientes"],
+            ["loyalty", "♥", "Lealtad"],
           ] as [View, string, string][]
         )
           .filter(
@@ -213,12 +273,22 @@ export default function MobileOffice({
             <button
               key={id}
               className={view === id ? "active" : ""}
-              onClick={() => setView(id)}
+              onClick={() => { if (id === "sales") setSalesFilter("all"); setView(id); }}
             >
               <i>{icon}</i>
               <span>{label}</span>
             </button>
           ))}
+        <div className="desktop-monthyva">
+          <span>TECNOLOGÍA POR</span>
+          <Image
+            src="/brand/monthyva-wordmark.png"
+            width={640}
+            height={160}
+            alt="Monthyva"
+            unoptimized
+          />
+        </div>
       </nav>
       {modal && (
         <Modal
@@ -230,14 +300,28 @@ export default function MobileOffice({
         >
           {modal === "Detalle de factura" ? (
             <InvoiceDetail invoice={selected!} />
+          ) : modal === "Ficha del cliente" ? (
+            <ClientDetail client={selected!} />
+          ) : modal === "Notificaciones" ? (
+            <NotificationCenter />
           ) : modal === "Aplicar pago" ? (
             <PaymentForm invoice={selected!} />
           ) : modal === "Pagar a Peptibra" ? (
             <PeptibraPaymentForm />
           ) : modal === "Pagar retiro" ? (
             <WithdrawalPayment initial={selected!} />
+          ) : modal === "BAC Lab" ? (
+            <BacLab />
+          ) : modal === "Lotes y trazabilidad" ? (
+            <InventoryLotsForm product={selected!} />
+          ) : modal === "Canjear premio" ? (
+            <RewardRedemptionForm reward={selected!} />
+          ) : modal === "Auditoría" ? (
+            <AuditLog />
           ) : modal.toLowerCase().includes("retiro") ? (
             <WithdrawalForm />
+          ) : modal === "Catálogo público" ? (
+            <CatalogVisibilityForm />
           ) : modal.toLowerCase().includes("producto") ? (
             <ProductForm initial={selected} />
           ) : modal.toLowerCase().includes("cliente") ? (
@@ -263,9 +347,26 @@ export default function MobileOffice({
   );
 
   function Home() {
-    const lowStock = products.filter((p) => stock(p.id) <= 0).length,
-      pendingInvoices = invoices.filter((i) => Number(i.balance || 0) > 0),
-      pendingRemittances = cash.filter((m) => String(m.category) === "Pago a Peptibra pendiente");
+    const currentMonth = currentMonthValue(),
+      monthInvoices = invoices.filter((invoice) => rowMonth(invoice) === reportMonth),
+      monthInvoiceIds = new Set(monthInvoices.map((invoice) => Number(invoice.id))),
+      monthSales = monthInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0),
+      monthCollected = monthInvoices.reduce((sum, invoice) => sum + Number(invoice.paid || 0), 0),
+      monthPending = monthInvoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0),
+      monthUnits = invoiceItems
+        .filter((item) => monthInvoiceIds.has(Number(item.invoice_id)))
+        .reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      monthLabel = new Intl.DateTimeFormat("es-DO", { month: "long", year: "numeric" }).format(
+        new Date(`${reportMonth}-01T12:00:00`),
+      ),
+      lowStock = products.filter((p) => stock(p.id) <= 0).length,
+      pendingInvoices = invoices.filter(isInvoicePending),
+      overdueInvoices = pendingInvoices.filter(isInvoiceOverdue),
+      allPending = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0),
+      pendingRemittances = cash.filter((m) => String(m.category) === "Pago a Peptibra pendiente"),
+      monthProductUnits = invoiceItems.filter(item=>monthInvoiceIds.has(Number(item.invoice_id))).reduce((totals,item)=>{const productId=Number(item.product_id);totals.set(productId,(totals.get(productId)||0)+Number(item.quantity||0));return totals},new Map<number,number>()),
+      topProducts=[...monthProductUnits.entries()].map(([productId,units])=>{const product=products.find(item=>Number(item.id)===productId);return{productId,units,name:String(product?.name||"Producto"),concentration:String(product?.concentration||"")}}).sort((a,b)=>b.units-a.units||`${a.name} ${a.concentration}`.localeCompare(`${b.name} ${b.concentration}`,"es")).slice(0,5),
+      maxProductUnits=Math.max(1,...topProducts.map(item=>item.units));
     return (
       <>
         <div className="flow-greeting">
@@ -279,7 +380,7 @@ export default function MobileOffice({
             title="Vender"
             hint="Crear una factura"
             tone="rose"
-            action={() => setModal("Nueva factura")}
+            action={() => { setSelected(null); setModal("Nueva factura"); }}
           />
           {isAdmin ? (
             <>
@@ -288,7 +389,7 @@ export default function MobileOffice({
                 title="Cobrar"
                 hint="Registrar un pago"
                 tone="sage"
-                action={() => setView("sales")}
+                action={() => { setSalesFilter("pending"); setView("sales"); }}
               />
               <FlowAction
                 icon="⇄"
@@ -307,28 +408,43 @@ export default function MobileOffice({
             </>
           ) : (
             <>
-              <FlowAction icon="▣" title="Cobrar" hint="Registrar un pago" tone="sage" action={() => setView("sales")} />
+              <FlowAction icon="▣" title="Cobrar" hint="Registrar un pago" tone="sage" action={() => { setSalesFilter("pending"); setView("sales"); }} />
               {isSeller && <FlowAction icon="↑" title="Pagar" hint="Pagar a Peptibra" tone="blue" action={() => setModal("Pagar a Peptibra")} />}
             </>
           )}
         </div>
+        <section className="dashboard-period" aria-label="Período del resumen de ventas">
+          <div>
+            <small>RESUMEN DE VENTAS</small>
+            <b>{monthLabel}</b>
+            <span>{monthInvoices.length} factura(s) en el período</span>
+          </div>
+          <label>
+            Consultar mes
+            <input
+              type="month"
+              value={reportMonth}
+              max={currentMonth}
+              onChange={(event) => setReportMonth(event.target.value || currentMonth)}
+            />
+          </label>
+        </section>
         <div className={`flow-strip ${!isAdmin ? "team" : ""}`}>
-          {isAdmin && (
-            <Card label="Hoy en caja" value={money(cashTotal)} tone="green" />
-          )}
-          <Card label="Por cobrar" value={money(pending)} tone="amber" />
-          <Card
-            label="En stock"
-            value={String(products.reduce((s, p) => s + stock(p.id), 0))}
-            tone="blue"
-          />
-          <Card label={isAdmin ? "Unidades vendidas" : "Mis unidades vendidas"} value={String(unitsSold)} tone="rose" />
-          {!isAdmin && <>
-            <Card label="Mis ventas" value={money(invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0))} tone="green" />
-            <Card label="Mis comisiones" value={money(access.commissionTotal)} tone="green" />
-          </>}
+          <Card label={isAdmin ? "Ventas del mes" : "Mis ventas del mes"} value={money(monthSales)} tone="green" />
+          <Card label="Cobrado de esas facturas" value={money(monthCollected)} tone="blue" />
+          <Card label="Por cobrar del mes" value={money(monthPending)} tone="amber" />
+          <Card label={isAdmin ? "Unidades del mes" : "Mis unidades del mes"} value={String(monthUnits)} tone="rose" />
         </div>
-        <ListTitle title="Para resolver" action={() => setView("sales")} />
+        <div className="dashboard-current-state">
+          <span><small>Caja actual</small><b>{money(cashTotal)}</b></span>
+          <span><small>Inventario actual</small><b>{products.reduce((sum, product) => sum + stock(product.id), 0)} unidades</b></span>
+          {!isAdmin && <span><small>Mis comisiones acumuladas</small><b>{money(access.commissionTotal)}</b></span>}
+        </div>
+        <section className="top-products-panel">
+          <header><div><small>DESEMPEÑO DEL PERÍODO</small><h2>Productos más vendidos</h2></div><span>{monthLabel}</span></header>
+          {topProducts.length?<div>{topProducts.map((item,index)=><article key={item.productId}><b>{String(index+1).padStart(2,"0")}</b><div><span>{item.name}</span><small>{item.concentration||"Presentación general"}</small><i><em style={{width:`${Math.max(8,item.units/maxProductUnits*100)}%`}}/></i></div><strong>{item.units}<small> unidad{item.units===1?"":"es"}</small></strong></article>)}</div>:<p>No hay productos facturados en este mes.</p>}
+        </section>
+        <ListTitle title="Para resolver" action={() => { setSalesFilter("pending"); setView("sales"); }} />
         <div className="resolve-list">
           {isAdmin && pendingRemittances.length > 0 && (
             <button onClick={() => setView("cash")}>
@@ -341,11 +457,14 @@ export default function MobileOffice({
             </button>
           )}
           {pendingInvoices.length ? (
-            <button onClick={() => setView("sales")}>
+            <button onClick={() => { setSalesFilter("pending"); setView("sales"); }}>
               <i>▤</i>
               <span>
                 <b>{pendingInvoices.length} factura(s) por cobrar</b>
-                <small>{money(pending)} pendiente</small>
+                <small>
+                  {money(allPending)} pendiente
+                  {overdueInvoices.length > 0 ? ` · 🔔 ${overdueInvoices.length} con más de 15 días` : ""}
+                </small>
               </span>
               <em>Cobrar</em>
             </button>
@@ -377,9 +496,9 @@ export default function MobileOffice({
               </button>
             )}
         </div>
-        <ListTitle title="Lo más reciente" action={() => setView("sales")} />
+        <ListTitle title={`Facturas de ${monthLabel}`} action={() => { setSalesFilter("all"); setView("sales"); }} />
         <div className="mobile-list recent-flow">
-          {invoices.slice(0, 4).map((i) => (
+          {monthInvoices.slice(0, 4).map((i) => (
             <article
               key={String(i.id)}
               onClick={() => {
@@ -388,30 +507,53 @@ export default function MobileOffice({
               }}
             >
               <div>
-                <b>{String(i.client_name)}</b>
+                <b>{String(i.client_name)} {isInvoiceOverdue(i) && <span className="overdue-bell" title="Factura pendiente con más de 15 días" aria-label="Factura vencida">🔔</span>}</b>
                 <span>{String(i.number)}</span>
               </div>
               <div className="right">
                 <b>{money(i.total)}</b>
+                {Number(i.total_dop) > 0 && <small>RD${Number(i.total_dop).toLocaleString("en-US", { maximumFractionDigits: 0 })}</small>}
                 <em className={String(i.status).toLowerCase()}>
                   {String(i.status)}
                 </em>
               </div>
             </article>
           ))}
+          {!monthInvoices.length && <div className="empty-state">No hay facturas registradas en {monthLabel}.</div>}
         </div>
       </>
     );
   }
+  function NotificationCenter(){
+    const read=(key:string)=>saveNotificationReads([...notificationReads,key]);
+    return <section className="notification-center">
+      <header><div><small>CENTRO DE SEGUIMIENTO</small><h3>{unreadNotifications.length} pendiente(s) por leer</h3></div>{unreadNotifications.length>0&&<button type="button" onClick={()=>saveNotificationReads([...notificationReads,...notifications.map(item=>item.key)])}>Marcar todas como leídas</button>}</header>
+      <div>{notifications.length?notifications.map(item=><article className={`${item.urgent?"urgent ":""}${notificationReads.includes(item.key)?"read":"unread"}`} key={item.key}><i>{item.kind==="cobro"?(item.urgent?"🔔":"$"):item.kind==="venta-equipo"?"🏆":"↻"}</i><div><small>{item.kind==="cobro"?"COBRO":item.kind==="venta-equipo"?"LOGRO DEL EQUIPO":"SEGUIMIENTO 30 DÍAS"}</small><b>{item.title}</b><p>{item.detail}</p><span>{item.meta}</span></div><aside>{!notificationReads.includes(item.key)&&<button type="button" onClick={()=>read(item.key)}>Marcar leída</button>}<button type="button" className="primary" onClick={()=>{read(item.key);if(item.kind==="cobro"||item.kind==="venta-equipo"){setSelected(item.invoice);setModal("Detalle de factura")}else if(item.client){setSelected(item.client);setModal("Ficha del cliente")}}}>{item.kind==="seguimiento"?"Ver cliente":"Ver factura"}</button><button type="button" className="trash-button" title="Eliminar notificación" aria-label="Eliminar notificación" onClick={()=>dismissNotification(item.key)}><TrashIcon/></button></aside></article>):<div className="notification-empty"><i>✓</i><b>Todo está al día</b><p>No hay cobros ni seguimientos pendientes.</p></div>}</div>
+    </section>
+  }
   function Sales() {
+    const currentMonth=currentMonthValue(),periodInvoices=invoices.filter(invoice=>rowMonth(invoice)===reportMonth),visibleInvoices=(salesFilter === "pending" ? periodInvoices.filter(isInvoicePending) : periodInvoices),periodLabel=new Intl.DateTimeFormat("es-DO",{month:"long",year:"numeric"}).format(new Date(`${reportMonth}-01T12:00:00`)),periodTotal=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.total||0),0),periodPaid=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.paid||0),0),periodPending=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.balance||0),0);
     return (
       <>
         <PageHead
           eyebrow={isSeller ? "MIS RESULTADOS" : "OPERACIONES"}
           title={isSeller ? "Mis ventas y comisiones" : "Ventas y facturas"}
           action="+ Factura"
-          onAction={() => setModal("Nueva factura")}
+          onAction={() => { setSelected(null); setModal("Nueva factura"); }}
         />
+        <section className="sales-period" aria-label="Período de facturas">
+          <div><small>FACTURAS DEL PERÍODO</small><b>{periodLabel}</b><span>{periodInvoices.length} factura(s)</span></div>
+          <label>Mes y año<input type="month" value={reportMonth} max={currentMonth} onChange={event=>setReportMonth(event.target.value||currentMonth)}/></label>
+        </section>
+        <div className="sales-period-totals">
+          <span><small>Total facturado</small><b>{money(periodTotal)}</b></span>
+          <span><small>Total cobrado</small><b>{money(periodPaid)}</b></span>
+          <span><small>Pendiente</small><b>{money(periodPending)}</b></span>
+        </div>
+        <div className="sales-filter" role="group" aria-label="Filtrar facturas">
+          <button type="button" className={salesFilter === "pending" ? "active" : ""} onClick={() => setSalesFilter("pending")}>Pendientes ({periodInvoices.filter(isInvoicePending).length})</button>
+          <button type="button" className={salesFilter === "all" ? "active" : ""} onClick={() => setSalesFilter("all")}>Todas</button>
+        </div>
         {isSeller && (
           <div className="cash-hero">
             <span>Comisiones acumuladas</span>
@@ -423,7 +565,7 @@ export default function MobileOffice({
           </div>
         )}
         <div className="mobile-list roomy">
-          {invoices.map((i) => (
+          {visibleInvoices.map((i) => (
             <article
               key={String(i.id)}
               onClick={() => {
@@ -432,7 +574,7 @@ export default function MobileOffice({
               }}
             >
               <div>
-                <b>{String(i.number)}</b>
+                <b>{String(i.number)} {isInvoiceOverdue(i) && <span className="overdue-bell" title="Factura pendiente con más de 15 días" aria-label="Factura vencida">🔔</span>}</b>
                 <span>
                   {String(i.client_name)} · {String(i.seller_name)}
                 </span>
@@ -440,12 +582,14 @@ export default function MobileOffice({
               </div>
               <div className="right">
                 <b>{money(i.total)}</b>
+                {Number(i.total_dop) > 0 && <small>RD${Number(i.total_dop).toLocaleString("en-US", { maximumFractionDigits: 0 })}</small>}
                 <em className={String(i.status).toLowerCase()}>
                   {String(i.status)}
                 </em>
               </div>
             </article>
           ))}
+          {!visibleInvoices.length && <div className="empty-state">No hay facturas pendientes de cobro.</div>}
         </div>
       </>
     );
@@ -462,13 +606,15 @@ export default function MobileOffice({
           action={isAdmin ? "+ Producto" : undefined}
           onAction={() => setModal("Nuevo producto")}
         />
+        <div className="inventory-total-card">
+          <span><small>Total disponible</small><b>{products.reduce((sum, product) => sum + stock(product.id), 0)} unidades</b></span>
+          <span><small>Presentaciones activas</small><b>{products.length}</b></span>
+        </div>
         {isAdmin && (
-          <button
-            className="print-module"
-            onClick={() => window.open("/ptbr-mobile/price-list", "_blank")}
-          >
-            Lista de precios · Imprimir / PDF
-          </button>
+          <div className="inventory-admin-actions">
+            <button className="print-module" onClick={() => setModal("Catálogo público")}>◉ Catálogo público</button>
+            <button className="print-module" onClick={() => window.location.assign("/ptbr-mobile/price-list")}>Lista de precios · Imprimir / PDF</button>
+          </div>
         )}
         <label className="mobile-search">
           ⌕
@@ -505,24 +651,39 @@ export default function MobileOffice({
                   <strong>{money(p.normal_price || p.price)}</strong>
                 </div>
                 <aside>
-                  <b
+                  <input
+                    aria-label={`Existencia de ${String(p.name)} ${String(p.concentration)}`}
                     className={
                       qty < 0
-                        ? "negative"
+                        ? "inventory-quantity negative"
                         : qty <= Number(p.reorder_point)
-                          ? "low"
-                          : ""
+                          ? "inventory-quantity low"
+                          : "inventory-quantity"
                     }
-                  >
-                    {qty}
-                  </b>
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={inventoryDrafts[Number(p.id)] ?? String(qty)}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onChange={(event) => setInventoryDrafts(current => ({...current, [Number(p.id)]: event.target.value}))}
+                    onBlur={(event) => setInventoryQuantity(p, event.target.value)}
+                  />
                   <span>unidades</span>
+                  <div className="inventory-stepper">
+                    <button type="button" aria-label={`Restar una unidad a ${String(p.name)}`} onMouseDown={(event) => event.preventDefault()} onClick={() => queueInventoryChange(p, -1)}>−</button>
+                    <button type="button" aria-label={`Sumar una unidad a ${String(p.name)}`} onMouseDown={(event) => event.preventDefault()} onClick={() => queueInventoryChange(p, 1)}>+</button>
+                  </div>
                   {isAdmin && (
                     <>
-                      <div>
-                        <button onClick={() => adjust(p, -1)}>−</button>
-                        <button onClick={() => adjust(p, 1)}>+</button>
-                      </div>
+                      <button
+                        className="edit-link"
+                        onClick={() => {
+                          setSelected(p);
+                          setModal("Lotes y trazabilidad");
+                        }}
+                      >
+                        Lotes
+                      </button>
                       <button
                         className="edit-link"
                         onClick={() => {
@@ -542,7 +703,154 @@ export default function MobileOffice({
       </>
     );
   }
+  function updateLocalStock(productId: number, change: number) {
+    const location = inventoryLocation;
+    setData((current) => {
+      const currentBalances = current.balances || [];
+      const found = currentBalances.some((balance) => Number(balance.product_id) === productId && String(balance.location) === location);
+      const nextBalances = found
+        ? currentBalances.map((balance) => Number(balance.product_id) === productId && String(balance.location) === location
+          ? { ...balance, quantity: Number(balance.quantity || 0) + change }
+          : balance)
+        : [...currentBalances, { product_id: productId, location, quantity: change }];
+      return { ...current, balances: nextBalances };
+    });
+  }
+  function queueInventoryChange(product: Row, change: number) {
+    const productId = Number(product.id);
+    if (!productId || !change) return;
+    setInventoryDrafts(current => { const next = {...current}; delete next[productId]; return next; });
+    updateLocalStock(productId, change);
+    inventoryPending.current.set(productId, (inventoryPending.current.get(productId) || 0) + change);
+    const prior = inventoryTimers.current.get(productId);
+    if (prior) clearTimeout(prior);
+    inventoryTimers.current.set(productId, setTimeout(() => flushInventoryChange(productId), 450));
+  }
+  function setInventoryQuantity(product: Row, rawValue: string) {
+    const productId = Number(product.id);
+    if (rawValue.trim() === "") { setInventoryDrafts(current => { const next = {...current}; delete next[productId]; return next; }); return; }
+    const target = Math.max(0, Math.trunc(Number(rawValue)));
+    if (!Number.isFinite(target)) { setInventoryDrafts(current => { const next = {...current}; delete next[productId]; return next; }); return; }
+    const change = target - stock(product.id);
+    if (change) queueInventoryChange(product, change);
+    else setInventoryDrafts(current => { const next = {...current}; delete next[productId]; return next; });
+  }
+  async function flushInventoryChange(productId: number) {
+    const change = inventoryPending.current.get(productId) || 0;
+    inventoryPending.current.delete(productId);
+    inventoryTimers.current.delete(productId);
+    if (!change) return;
+    const previous = inventorySaving.current.get(productId) || Promise.resolve();
+    const saving = previous.then(async () => {
+      const response = await fetch("/api/mobile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "adjustStock", data: { productId, location: inventoryLocation, change, reason: "Ajuste de inventario propio" } }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        updateLocalStock(productId, -change);
+        setError(result.error || "No se pudo actualizar el inventario");
+        return;
+      }
+      fetch("/api/mobile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "touchRevision", data: {} }) }).catch(() => {});
+    }).catch(() => {
+      updateLocalStock(productId, -change);
+      setError("No se pudo actualizar el inventario");
+    });
+    inventorySaving.current.set(productId, saving);
+    await saving;
+    if (inventorySaving.current.get(productId) === saving) inventorySaving.current.delete(productId);
+  }
+  function CatalogVisibilityForm() {
+    const families = [...new Set(products.map((product) => String(product.name)).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "es"));
+    const stored = settings.find((setting) => setting.key === "web_catalog_names")?.value;
+    const initialConfig = (() => {
+      if (!stored) return { order: families, visible: families };
+      try {
+        const parsed = JSON.parse(String(stored));
+        if (Array.isArray(parsed)) {
+          const visible = parsed.map(String).filter((name) => families.includes(name));
+          return { order: [...visible, ...families.filter((name) => !visible.includes(name))], visible };
+        }
+        if (parsed && typeof parsed === "object") {
+          const savedOrder: string[] = Array.isArray(parsed.order) ? parsed.order.map(String) : [];
+          const order = [...savedOrder.filter((name) => families.includes(name)), ...families.filter((name) => !savedOrder.includes(name))];
+          const visible: string[] = Array.isArray(parsed.visible)
+            ? parsed.visible.map(String).filter((name: string) => families.includes(name))
+            : families;
+          return { order, visible };
+        }
+        return { order: families, visible: families };
+      } catch {
+        return { order: families, visible: families };
+      }
+    })();
+    const [orderedNames, setOrderedNames] = useState<string[]>(initialConfig.order);
+    const [visibleNames, setVisibleNames] = useState<string[]>(initialConfig.visible);
+    const [draggingName, setDraggingName] = useState("");
+    const toggle = (name: string) => setVisibleNames((current) =>
+      current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
+    );
+    const move = (name: string, target: string) => setOrderedNames((current) => {
+      if (!name || name === target) return current;
+      const next = current.filter((item) => item !== name);
+      next.splice(Math.max(0, next.indexOf(target)), 0, name);
+      return next;
+    });
+    const nudge = (name: string, direction: -1 | 1) => setOrderedNames((current) => {
+      const from = current.indexOf(name), to = from + direction;
+      if (from < 0 || to < 0 || to >= current.length) return current;
+      const next = [...current];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+    return <form className="catalog-visibility" onSubmit={(event) => {
+      event.preventDefault();
+      post("saveSetting", { key: "web_catalog_names", value: JSON.stringify({ order: orderedNames, visible: visibleNames }) });
+    }}>
+      <p>Elige qué familias aparecen en la página pública y arrástralas para definir su orden. Esto no elimina productos ni cambia el inventario.</p>
+      <div className="catalog-visibility-tools">
+        <button type="button" onClick={() => setVisibleNames(families)}>Mostrar todos</button>
+        <button type="button" onClick={() => setVisibleNames([])}>Ocultar todos</button>
+        <b>{visibleNames.length} de {families.length} visibles</b>
+      </div>
+      <div className="catalog-visibility-list">{orderedNames.map((name, index) => {
+        const presentations = products.filter((product) => String(product.name) === name).map((product) => String(product.concentration)).filter(Boolean);
+        const checked = visibleNames.includes(name);
+        return <div
+          key={name}
+          className={`${checked ? "visible" : "hidden"}${draggingName === name ? " dragging" : ""}`}
+          draggable
+          onDragStart={(event) => { setDraggingName(name); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", name); }}
+          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
+          onDrop={(event) => { event.preventDefault(); move(event.dataTransfer.getData("text/plain") || draggingName, name); setDraggingName(""); }}
+          onDragEnd={() => setDraggingName("")}
+        >
+          <i className="catalog-drag-handle" aria-hidden="true">⠿</i>
+          <label>
+            <input type="checkbox" checked={checked} onChange={() => toggle(name)}/>
+            <span><b>{name}</b><small>{presentations.join(" · ") || "Sin presentación"}</small></span>
+          </label>
+          <em>{checked ? "Visible" : "Oculto"}</em>
+          <span className="catalog-order-buttons">
+            <button type="button" disabled={index === 0} onClick={() => nudge(name, -1)} aria-label={`Subir ${name}`}>↑</button>
+            <button type="button" disabled={index === orderedNames.length - 1} onClick={() => nudge(name, 1)} aria-label={`Bajar ${name}`}>↓</button>
+          </span>
+        </div>;
+      })}</div>
+      <button className="primary" type="submit">Guardar catálogo público</button>
+    </form>;
+  }
   function Clients() {
+    const alphabetical = [...clients].sort((a, b) =>
+      `${String(a.first_name)} ${String(a.last_name)}`.localeCompare(
+        `${String(b.first_name)} ${String(b.last_name)}`,
+        "es",
+        { sensitivity: "base" },
+      ),
+    );
     return (
       <>
         <PageHead
@@ -552,12 +860,12 @@ export default function MobileOffice({
           onAction={() => setModal("Nuevo cliente")}
         />
         <div className="mobile-list roomy">
-          {clients.map((c) => (
+          {alphabetical.map((c) => (
             <article
               key={String(c.id)}
               onClick={() => {
                 setSelected(c);
-                setModal("Editar cliente");
+                setModal("Ficha del cliente");
               }}
             >
               <i className="avatar">{String(c.first_name).slice(0, 1)}</i>
@@ -568,15 +876,59 @@ export default function MobileOffice({
                 <span>
                   {String(c.code)} · {String(c.phone || "Sin teléfono")}
                 </span>
+                <small>{Number(c.purchase_count||0)} compra(s) · {money(c.lifetime_value)} · Nivel de lealtad {Number(c.loyalty_discount_pct||0).toFixed(0)}%</small>
               </div>
-              <button className="mini">Editar</button>
+              <div className="client-row-actions">
+                <button className="mini" type="button" onClick={(event)=>{event.stopPropagation();setSelected(c);setModal("Editar cliente")}}>Editar</button>
+                <button className="trash-button" type="button" title="Eliminar cliente" aria-label={`Eliminar a ${String(c.first_name)} ${String(c.last_name)}`} onClick={(event)=>{event.stopPropagation();if(confirm(`¿Eliminar a ${String(c.first_name)} ${String(c.last_name)}? Si tiene facturas, quedará archivado para conservar el historial.`))post("deleteClient",{id:c.id})}}><TrashIcon/></button>
+              </div>
             </article>
           ))}
         </div>
+        {isAdmin && inactiveClients.length > 0 && <>
+          <ListTitle title="Clientes inactivos" />
+          <div className="mobile-list roomy inactive-clients">
+            {[...inactiveClients].sort((a,b)=>`${String(a.first_name)} ${String(a.last_name)}`.localeCompare(`${String(b.first_name)} ${String(b.last_name)}`,"es",{sensitivity:"base"})).map((client)=><article key={String(client.id)}>
+              <i className="avatar">{String(client.first_name).slice(0,1)}</i>
+              <div><b>{String(client.first_name)} {String(client.last_name)}</b><span>{String(client.code)} · Cliente archivado</span><small>{Number(client.purchase_count||0)} factura(s) históricas</small></div>
+              <button type="button" className="trash-button" title="Eliminar cliente" aria-label={`Eliminar definitivamente a ${String(client.first_name)} ${String(client.last_name)}`} onClick={()=>confirm(`¿Eliminar definitivamente a ${String(client.first_name)} ${String(client.last_name)}?`)&&post("deleteInactiveClient",{id:client.id})}><TrashIcon/></button>
+            </article>)}
+          </div>
+        </>}
       </>
     );
   }
+  function ClientDetail({client}:{client:Row}) {
+    const clientInvoices=invoices.filter(invoice=>Number(invoice.client_id)===Number(client.id)).sort((a,b)=>new Date(String(b.created_at||"")).getTime()-new Date(String(a.created_at||"")).getTime()),invoiceIds=new Set(clientInvoices.map(invoice=>Number(invoice.id))),clientItems=invoiceItems.filter(item=>invoiceIds.has(Number(item.invoice_id))),productTotals=new Map<number,number>();
+    for(const item of clientItems)productTotals.set(Number(item.product_id),(productTotals.get(Number(item.product_id))||0)+Number(item.quantity||0));
+    const total=clientInvoices.reduce((sum,invoice)=>sum+Number(invoice.total||0),0),paid=clientInvoices.reduce((sum,invoice)=>sum+Number(invoice.paid||0),0),pending=clientInvoices.reduce((sum,invoice)=>sum+Number(invoice.balance||0),0);
+    return <section className="client-detail">
+      <header><i className="avatar">{String(client.first_name).slice(0,1)}</i><div><h3>{String(client.first_name)} {String(client.last_name)}</h3><span>{String(client.code)} · {String(client.phone||"Sin teléfono")}</span></div><button type="button" onClick={()=>setModal("Editar cliente")}>Editar</button></header>
+      <div className="client-detail-metrics"><span><small>Compras</small><b>{clientInvoices.length}</b></span><span><small>Total facturado</small><b>{money(total)}</b></span><span><small>Total pagado</small><b>{money(paid)}</b></span><span><small>Pendiente</small><b>{money(pending)}</b></span></div>
+      <h4>Productos adquiridos</h4>
+      <div className="client-product-history">{productTotals.size?[...productTotals.entries()].sort((a,b)=>String(products.find(product=>Number(product.id)===a[0])?.name||"").localeCompare(String(products.find(product=>Number(product.id)===b[0])?.name||""),"es",{sensitivity:"base",numeric:true})).map(([productId,quantity])=><span key={productId}><b>{String(products.find(product=>Number(product.id)===productId)?.name||"Producto")}</b><em>{quantity} unidad(es)</em></span>):<p>Este cliente todavía no tiene productos registrados.</p>}</div>
+      <h4>Facturas</h4>
+      <div className="client-invoice-history">{clientInvoices.length?clientInvoices.map(invoice=><button type="button" key={String(invoice.id)} onClick={()=>{setSelected(invoice);setModal("Detalle de factura")}}><span><b>{String(invoice.number)}</b><small>{String(invoice.created_at||"").slice(0,10)} · {String(invoice.status)}</small></span><strong>{money(invoice.total)}</strong></button>):<p>No hay facturas registradas para este cliente.</p>}</div>
+    </section>;
+  }
+  function Loyalty(){
+    const setting=(key:string,fallback:string)=>String(settings.find(x=>String(x.key)===key)?.value??fallback);
+    return <><PageHead eyebrow="FIDELIZACIÓN" title="Programa de lealtad"/><LoyaltySettings values={{enabled:setting("lealtad_activa","1")}}/><ListTitle title="Ranking por compras"/><div className="mobile-list roomy loyalty-ledger">{clients.map((c,index)=>{const rewards=loyaltyRewards.filter(reward=>Number(reward.client_id)===Number(c.id)),available=rewards.filter(reward=>String(reward.status)==="earned"),redeemed=rewards.filter(reward=>String(reward.status)==="redeemed");return <article key={String(c.id)}><i className="avatar">{index+1}</i><div><b>{String(c.first_name)} {String(c.last_name)}</b><span>{Number(c.purchase_count||0)} compra(s) · {money(c.lifetime_value)}</span><small>Nivel permanente: {Number(c.loyalty_discount_pct||0).toFixed(0)}% · {Number(c.qualified_referrals||0)} referido(s)</small><small>Premios: {available.length} disponible(s) · {redeemed.length} canjeado(s)</small></div>{isAdmin&&available[0]&&<button className="mini" type="button" onClick={()=>{setSelected({...available[0],client_name:`${String(c.first_name)} ${String(c.last_name)}`});setModal("Canjear premio")}}>Canjear producto</button>}</article>})}</div></>
+  }
+  function LoyaltySettings({values}:{values:Row}) {
+    return <form className="loyalty-settings" onSubmit={e=>{e.preventDefault();const f=val(e.currentTarget);post("saveLoyaltySettings",{...f,enabled:new FormData(e.currentTarget).get("enabled")==="on",cumulative:new FormData(e.currentTarget).get("cumulative")==="on"})}}>
+      <div><b>Reglas de lealtad</b><small>1.ª y 2.ª sin descuento; 3.ª: 5%; 7.ª: 15%; desde la 10.ª: 20% fijo. El nivel nunca se reinicia. Por cada 10 clientes referidos, se gana 1 producto gratis.</small></div>
+      <label><input name="enabled" type="checkbox" defaultChecked={String(values.enabled)==="1"}/> Activo</label>
+      <button>Guardar reglas</button>
+    </form>
+  }
   function Cash() {
+    const matchesRange=(row:Row)=>cashRange==="all"||rowMonth(row).startsWith(cashRange==="year"?cashYear:reportMonth),periodInvoices=invoices.filter(matchesRange),periodInvoiceIds=new Set(periodInvoices.map(invoice=>Number(invoice.id))),periodCash=cash.filter(matchesRange),periodSales=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.total||0),0),periodCollected=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.paid||0),0),periodPending=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.balance||0),0),periodUnits=invoiceItems.filter(item=>periodInvoiceIds.has(Number(item.invoice_id))).reduce((sum,item)=>sum+Number(item.quantity||0),0),periodCashNet=periodCash.reduce((sum,movement)=>sum+(String(movement.type)==="Ingreso"?Number(movement.amount||0):String(movement.type)==="Egreso"?-Number(movement.amount||0):0),0),availableYears=[...new Set([...invoices,...cash].map(row=>rowMonth(row).slice(0,4)).filter(year=>/^\d{4}$/.test(year)))].sort((a,b)=>b.localeCompare(a)),rangeLabel=cashRange==="all"?"Todo el historial":cashRange==="year"?cashYear:new Intl.DateTimeFormat("es-DO",{month:"long",year:"numeric"}).format(new Date(`${reportMonth}-01T12:00:00`));
+    const canDeleteCash = (movement: Row) => isAdmin && !movement.invoice_id && !movement.withdrawal_id && !movement.purchase_id && !["Pago a Peptibra pendiente", "Pago de vendedor a Peptibra"].includes(String(movement.category));
+    const deletableCashIds = periodCash.filter(canDeleteCash).map((movement) => Number(movement.id));
+    const [selectedCashIds, setSelectedCashIds] = useState<number[]>([]);
+    const toggleCash = (id: number) => setSelectedCashIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    const allCashSelected = deletableCashIds.length > 0 && deletableCashIds.every((id) => selectedCashIds.includes(id));
     return (
       <>
         <PageHead
@@ -585,18 +937,35 @@ export default function MobileOffice({
           action="+ Movimiento"
           onAction={() => setModal("Movimiento de caja")}
         />
+        <section className="cash-period-filter" aria-label="Filtrar finanzas">
+          <div className="cash-range-tabs">
+            <button type="button" className={cashRange==="month"?"active":""} onClick={()=>setCashRange("month")}>Por mes</button>
+            <button type="button" className={cashRange==="year"?"active":""} onClick={()=>setCashRange("year")}>Por año</button>
+            <button type="button" className={cashRange==="all"?"active":""} onClick={()=>setCashRange("all")}>Todo</button>
+          </div>
+          {cashRange==="month"&&<label>Mes y año<input type="month" value={reportMonth} max={currentMonthValue()} onChange={event=>setReportMonth(event.target.value||currentMonthValue())}/></label>}
+          {cashRange==="year"&&<label>Año<select value={cashYear} onChange={event=>setCashYear(event.target.value)}>{availableYears.map(year=><option key={year}>{year}</option>)}</select></label>}
+          <strong>{rangeLabel}</strong>
+        </section>
         <div className="cash-hero">
-          <span>Disponible en caja</span>
-          <b>{money(cashTotal)}</b>
-          <small>Todos los movimientos están expresados en USD</small>
-          <button onClick={() => window.open("/ptbr-mobile/cash", "_blank")}>
+          <span>Ventas totales · {rangeLabel}</span>
+          <b>{money(periodSales)}</b>
+          <small>{periodInvoices.length} factura(s) · Todos los importes están expresados en USD</small>
+          <button onClick={() => window.location.assign("/ptbr-mobile/cash")}>
             Imprimir / Guardar PDF
           </button>
         </div>
+        <div className="mobile-metrics cash-period-metrics">
+          <Card label="Cobrado de esas ventas" value={money(periodCollected)} tone="green" />
+          <Card label="Pendiente de cobro" value={money(periodPending)} tone="amber" />
+          <Card label="Unidades vendidas" value={String(periodUnits)} tone="blue" />
+          <Card label="Flujo neto de movimientos" value={money(periodCashNet)} />
+        </div>
+        <ListTitle title="Indicadores financieros generales" />
         <div className="mobile-metrics cash-metrics">
           <Card
-            label="Para reponer inventario"
-            value={money(reserve)}
+            label={`Recomendación para reponer (${retention.toFixed(0)}%)`}
+            value={money(retained)}
             tone="amber"
           />
           <Card
@@ -606,8 +975,8 @@ export default function MobileOffice({
             )}
           />
           <Card
-            label="Guardado para el negocio"
-            value={money(retained)}
+            label="Ganancia cobrada"
+            value={money(netProfit)}
             tone="blue"
           />
           <Card
@@ -617,9 +986,9 @@ export default function MobileOffice({
           />
         </div>
         <div className="cash-explanation">
-          Ganancia cobrada {money(netProfit)} · Proveedores pendientes{" "}
-          {money(supplierDue)} · Se guarda {retention.toFixed(1)}% para el
-          negocio.
+          Sugerencia: reservar {retention.toFixed(1)}% de la ganancia cobrada
+          para reponer inventario. Este monto es orientativo y no se descuenta
+          ni se aparta automáticamente. · Proveedores pendientes {money(supplierDue)}.
         </div>
         <ListTitle title="Dinero pendiente por socio" />
         <div className="partner-bars">
@@ -637,10 +1006,16 @@ export default function MobileOffice({
             </div>
           ))}
         </div>
-        <ListTitle title="Movimientos" />
+        <ListTitle title={`Movimientos · ${rangeLabel}`} />
+        {deletableCashIds.length > 0 && <div className="cash-bulk-toolbar">
+          <label><input type="checkbox" checked={allCashSelected} onChange={() => setSelectedCashIds(allCashSelected ? [] : deletableCashIds)} /> Seleccionar todos los borrables</label>
+          <span>{selectedCashIds.length} seleccionado(s)</span>
+          <button type="button" className="trash-button batch-trash" title="Eliminar movimientos seleccionados" aria-label="Eliminar movimientos seleccionados" disabled={!selectedCashIds.length} onClick={() => { if (confirm(`¿Eliminar definitivamente ${selectedCashIds.length} movimiento(s) seleccionado(s)?`)) post("deleteCashMovements", { ids: selectedCashIds }); }}><TrashIcon/><b>{selectedCashIds.length}</b></button>
+        </div>}
         <div className="mobile-list roomy">
-          {cash.map((m) => (
+          {periodCash.map((m) => (
             <article key={String(m.id)}>
+              {canDeleteCash(m) && <label className="cash-row-check" title="Seleccionar para eliminar"><input type="checkbox" checked={selectedCashIds.includes(Number(m.id))} onChange={() => toggleCash(Number(m.id))} /><span className="sr-only">Seleccionar movimiento</span></label>}
               <i className={m.type === "Ingreso" ? "cash-in" : "cash-out"}>
                 {m.type === "Ingreso" ? "↓" : "↑"}
               </i>
@@ -659,20 +1034,10 @@ export default function MobileOffice({
                     Confirmar recibido
                   </button>
                 )}
-                {!m.invoice_id && !m.withdrawal_id && !m.purchase_id && !["Pago a Peptibra pendiente","Pago de vendedor a Peptibra"].includes(String(m.category)) && (
-                  <button
-                    className="edit-link"
-                    onClick={() =>
-                      confirm("¿Eliminar este movimiento manual?") &&
-                      post("deleteCashMovement", { id: m.id })
-                    }
-                  >
-                    Eliminar
-                  </button>
-                )}
               </div>
             </article>
           ))}
+          {!periodCash.length&&<div className="empty-state">No hay movimientos en este período.</div>}
         </div>
       </>
     );
@@ -680,21 +1045,23 @@ export default function MobileOffice({
   function Protocols() {
     return (
       <>
-        <PageHead eyebrow="DOCUMENTOS" title="Protocolos" />
-        <p className="page-intro">Abre un protocolo para imprimirlo, guardarlo como PDF o compartirlo con tu cliente.</p>
+        <PageHead eyebrow="DOCUMENTOS" title="Protocolos" action="+ Nuevo protocolo" onAction={() => {setSelected(null);setModal("Nuevo protocolo")}} />
+        <p className="page-intro">Abre un protocolo para imprimirlo, guardarlo como PDF o compartirlo. Solo puedes modificar los protocolos creados por tu propia cuenta.</p>
         <div className="mobile-list roomy">
           {protocols.map((p) => (
             <article
+              className="protocol-list-row"
               key={String(p.id)}
-              onClick={() => window.open(`/ptbr-mobile/protocols/${p.id}`, "_blank")}
+              onClick={() => window.location.assign(`/ptbr-mobile/protocols/${p.id}`)}
             >
               <div>
                 <b>{String(p.name)}</b>
                 <span>{String(products.find((x) => x.id === p.product_id)?.name || "")}</span>
               </div>
-              <div className="right">
-                <b>Abrir</b>
-                <small>Imprimir / PDF</small>
+              <div className="protocol-row-actions">
+                <button type="button" className="protocol-open" onClick={(event) => { event.stopPropagation(); window.location.assign(`/ptbr-mobile/protocols/${p.id}`); }}>Abrir</button>
+                {Boolean(p.can_edit) && <button type="button" onClick={(event) => { event.stopPropagation(); setSelected(p); setModal("Editar protocolo"); }}>Editar</button>}
+                {Boolean(p.can_delete) && <button type="button" className="trash-button" title="Eliminar protocolo" aria-label={`Eliminar protocolo ${String(p.name)}`} onClick={(event) => { event.stopPropagation(); if (confirm(`¿Eliminar definitivamente el protocolo “${String(p.name)}”?`)) post("deleteProtocol", { id: p.id }); }}><TrashIcon/></button>}
               </div>
             </article>
           ))}
@@ -729,14 +1096,14 @@ export default function MobileOffice({
             action={() => setModal("Nuevo retiro")}
           />
           <Module
-            title="Calculadora"
-            count={calculations.length}
-            action={() => setModal("Nuevo cálculo")}
+            title="BAC Lab"
+            count={0}
+            action={() => setModal("BAC Lab")}
           />
           <Module
-            title="Protocolos"
-            count={protocols.length}
-            action={() => setModal("Nuevo protocolo")}
+            title="Auditoría"
+            count={auditLog.length}
+            action={() => setModal("Auditoría")}
           />
           <Module
             title="Configuración"
@@ -841,75 +1208,35 @@ export default function MobileOffice({
             </article>
           ))}
         </div>
-        <ListTitle title="Protocolos" />
-        <div className="mobile-list">
-          {protocols.map((p) => (
-            <article
-              key={String(p.id)}
-              onClick={() => {
-                setSelected(p);
-                setModal("Editar protocolo");
-              }}
-            >
-              <div>
-                <b>{String(p.name)}</b>
-                <span>
-                  {String(
-                    products.find((x) => x.id === p.product_id)?.name || "",
-                  )}
-                </span>
-              </div>
-            </article>
-          ))}
-        </div>
       </>
     );
   }
-  async function adjust(p: Row, change: number) {
-    await post("adjustStock", {
-      productId: p.id,
-      location: "GENERAL",
-      change,
-      reason: "Ajuste desde móvil",
-    });
+  function InventoryLotsForm({product}:{product:Row}) {
+    const lots=inventoryLots.filter(lot=>Number(lot.product_id)===Number(product.id)&&String(lot.location)===inventoryLocation).sort((a,b)=>String(a.expires_at||"9999").localeCompare(String(b.expires_at||"9999"))||String(a.created_at).localeCompare(String(b.created_at)));
+    return <section className="lot-manager">
+      <header><div><small>PRODUCTO</small><h3>{String(product.name)} {String(product.concentration)}</h3></div><b>{lots.reduce((sum,lot)=>sum+Number(lot.available_quantity||0),0)} unidades trazadas</b></header>
+      <form className="mobile-form" onSubmit={event=>{event.preventDefault();post("saveInventoryLot",{...val(event.currentTarget),productId:product.id})}}>
+        <div className="form-pair"><Field name="lotNumber" label="Número de lote" required/><Field name="quantity" label="Cantidad recibida" type="number" required/></div>
+        <div className="form-pair"><Field name="manufacturedAt" label="Fecha de fabricación" type="date"/><Field name="expiresAt" label="Fecha de vencimiento" type="date"/></div>
+        <div className="form-pair"><Field name="unitCost" label="Costo unitario" type="number"/><Select name="supplierId" label="Proveedor" items={suppliers} render={supplier=>String(supplier.name)} optional/></div>
+        <Field name="coaUrl" label="Enlace del COA" type="url"/><Field name="notes" label="Notas"/>
+        <button>Recibir lote y sumar inventario</button>
+      </form>
+      <div className="lot-list">{lots.map(lot=><article key={String(lot.id)}><div><b>Lote {String(lot.lot_number)}</b><span>Disponible {String(lot.available_quantity)} de {String(lot.received_quantity)}</span><small>{lot.expires_at?`Vence ${String(lot.expires_at)}`:"Sin vencimiento registrado"}</small></div><div>{Boolean(lot.coa_url)&&<a href={String(lot.coa_url)} target="_blank" rel="noreferrer">Ver COA</a>}<strong>{String(lot.status)}</strong></div></article>)}{!lots.length&&<p>No hay lotes registrados para esta presentación.</p>}</div>
+    </section>;
   }
-  async function uploadPhoto(productId: unknown, file: File) {
-    const form = new FormData();
-    form.set("productId", String(productId));
-    form.set("file", file);
-    setError("");
-    const r = await fetch("/api/mobile/upload", { method: "POST", body: form }),
-      j = await r.json();
-    if (!r.ok) {
-      setError(j.error || "No se pudo subir la fotografía");
-      return;
-    }
-    await load();
+  function RewardRedemptionForm({reward}:{reward:Row}) {
+    return <form className="mobile-form reward-redemption" onSubmit={event=>{event.preventDefault();post("redeemReferralReward",{...val(event.currentTarget),rewardId:reward.id})}}>
+      <p><b>{String(reward.client_name)}</b> utilizará el premio correspondiente a sus referidos. El canje quedará guardado en la auditoría.</p>
+      <Select name="productId" label="Producto entregado" items={alphabeticalProducts} render={product=>`${String(product.name)} · ${String(product.concentration)}`}/>
+      <Field name="invoiceId" label="Factura relacionada (opcional)" type="number"/>
+      <Field name="notes" label="Notas del canje"/>
+      <button>Confirmar canje</button>
+    </form>;
   }
-  async function transfer(p: Row) {
-    const locations = [
-        "GENERAL",
-        ...team.map((x) =>
-          x.role === "Socio" ? `SOCIO:${x.id}` : `VENDEDOR:${x.id}`,
-        ),
-      ],
-      from = prompt(`Desde:\n${locations.join("\n")}`, "GENERAL"),
-      to = prompt(`Hacia:\n${locations.join("\n")}`, locations[1] || "GENERAL"),
-      quantity = Number(prompt("Cantidad a transferir:", "1"));
-    if (from && to && quantity > 0)
-      await post("transferInventory", { productId: p.id, from, to, quantity });
-  }
-  async function locationAdjust(p: Row, location: string) {
-    const change = Number(
-      prompt(`Ajuste para ${location}. Usa negativo para restar:`, "0"),
-    );
-    if (change)
-      await post("adjustStock", {
-        productId: p.id,
-        location,
-        change,
-        reason: "Ajuste manual desde móvil",
-      });
+  function AuditLog() {
+    const label=(entry:Row)=>({create:"Creó",update:"Editó",delete:"Eliminó",adjust:"Ajustó",payment:"Registró pago",redeem:"Canjeó",restore:"Restauró"}[String(entry.action)]||String(entry.action));
+    return <section className="audit-log"><p>Registro de las operaciones sensibles más recientes. Este historial no se modifica desde la interfaz.</p><div>{auditLog.map(entry=><article key={String(entry.id)}><div><b>{label(entry)} · {String(entry.entity_type)}</b><span>{String(entry.actor_email||entry.actor_id)}</span></div><div><strong>#{String(entry.entity_id||"—")}</strong><small>{new Date(String(entry.created_at)).toLocaleString("es-DO")}</small></div></article>)}{!auditLog.length&&<p>No hay eventos auditados todavía.</p>}</div></section>;
   }
   async function pay(i: Row) {
     setSelected(i);
@@ -922,6 +1249,9 @@ export default function MobileOffice({
     };
   }
   function ProductForm({ initial }: { initial: Row | null }) {
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [savingProduct, setSavingProduct] = useState(false);
+    const [productError, setProductError] = useState("");
     const concentrations = [5, 10, 15, 20, 30, 40, 50, 100];
     const mgOf = (value: unknown) =>
       Number(
@@ -936,38 +1266,86 @@ export default function MobileOffice({
             String(initial.name).trim().toLowerCase(),
         )
       : [];
+    const defaultComplement = products.find((product) => /bac water|bacteriost/i.test(String(product.name)) && /3\s*ml/i.test(String(product.concentration))) || products.find((product) => /bac water|bacteriost/i.test(String(product.name)));
     const variantByMg = new Map(family.map((x) => [mgOf(x.concentration), x]));
     const otherVariant =
       initial && !mgOf(initial.concentration) ? initial : null;
-    const locations = initial
-      ? balances.filter((x) => x.product_id === initial.id)
-      : [];
-    const moves = initial
-      ? inventoryMovements
-          .filter((x) => x.product_id === initial.id)
-          .slice(-8)
-          .reverse()
-      : [];
     return (
       <>
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            post("saveProductFamily", {
-              ...val(e.currentTarget),
-              id: initial?.id,
-              oldName: initial?.name,
-            });
+            if (savingProduct) return;
+            setSavingProduct(true);
+            setProductError("");
+            try {
+              const formValues = val(e.currentTarget);
+              delete formValues.photo;
+              const response = await fetch("/api/mobile", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  action: "saveProductFamily",
+                  data: {
+                    ...formValues,
+                    id: initial?.id,
+                    oldName: initial?.name,
+                  },
+                }),
+              });
+              const result = await response.json();
+              if (!response.ok) {
+                setProductError(result.error || "No se pudo guardar el producto");
+                return;
+              }
+              if (photoFile && result.id) {
+                const photoData = new FormData();
+                photoData.set("productId", String(result.id));
+                photoData.set("file", photoFile);
+                const photoResponse = await fetch("/api/mobile/upload", {
+                  method: "POST",
+                  body: photoData,
+                });
+                const photoResult = await photoResponse.json();
+                if (!photoResponse.ok) {
+                  setProductError(
+                    `El producto se guardó, pero la fotografía no pudo subirse: ${photoResult.error || "error desconocido"}`,
+                  );
+                  await load();
+                  return;
+                }
+              } else {
+                await fetch("/api/mobile", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ action: "touchRevision", data: {} }),
+                });
+              }
+              setModal(null);
+              setSelected(null);
+              await load();
+            } catch {
+              setProductError("No se pudo conectar para guardar el producto. Intenta nuevamente.");
+            } finally {
+              setSavingProduct(false);
+            }
           }}
           className="mobile-form"
         >
           <Field name="name" label="Nombre" required value={initial?.name} />
           <Field
-            name="sku"
-            label="Código base / SKU"
-            required
-            value={initial?.sku}
+            name="publicName"
+            label="Nombre público"
+            value={initial?.public_name || initial?.name}
           />
+          <small>
+            El nombre interno se usa en inventario, facturas y lista de precios.
+            El nombre público es el que verán los clientes en el sitio web.
+          </small>
+          <div className="auto-sku-note">
+            <b>SKU automático</b>
+            <small>El sistema asignará un código único con el prefijo PTBR-.</small>
+          </div>
           <Field
             name="description"
             label="Descripción"
@@ -1030,26 +1408,49 @@ export default function MobileOffice({
             type="number"
             value={initial?.wholesale_minimum}
           />
-          {initial && (
-            <label>
-              Fotografía
+          <div className="product-complement-rule">
+            <label className="checkline">
               <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) =>
-                  e.target.files?.[0] &&
-                  uploadPhoto(initial.id, e.target.files[0])
-                }
+                name="complementEnabled"
+                type="checkbox"
+                defaultChecked={Boolean(initial?.complement_enabled ?? true)}
               />
+              Este producto necesita un producto complementario
             </label>
-          )}
-          <button>Guardar producto y presentaciones</button>
+            <div className="form-pair">
+              <label>
+                Producto complementario
+                <select name="complementProductId" defaultValue={String(initial?.complement_product_id || defaultComplement?.id || "")}>
+                  <option value="">Seleccionar</option>
+                  {products.filter((product) => Number(product.id) !== Number(initial?.id)).sort((a,b)=>`${String(a.name)} ${String(a.concentration)}`.localeCompare(`${String(b.name)} ${String(b.concentration)}`,"es",{sensitivity:"base"})).map((product)=><option key={String(product.id)} value={String(product.id)}>{String(product.name)} {String(product.concentration)}</option>)}
+                </select>
+              </label>
+              <Field name="complementQuantity" label="Cantidad por unidad vendida" type="number" value={initial?.complement_quantity || 1} />
+            </div>
+            <small>Ejemplo: cada vial de péptido puede requerir 1 Agua BAC de 3 ml. Puedes desactivar esta regla para plumas u otros productos.</small>
+          </div>
+          <label className="product-photo-field">
+            Fotografía del producto
+            <input
+              name="photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
+            />
+            <small>
+              {photoFile
+                ? photoFile.name
+                : initial?.photo_key
+                  ? "Se conservará la fotografía actual si no eliges otra."
+                  : "JPG, PNG, WebP o GIF · máximo 8 MB. Se aplicará a todas las presentaciones."}
+            </small>
+          </label>
+          {productError && <div className="product-form-error">{productError}</div>}
+          <button disabled={savingProduct}>
+            {savingProduct ? "Guardando…" : "Guardar producto y presentaciones"}
+          </button>
           {initial && (
             <>
-              <button type="button" onClick={() => transfer(initial)}>
-                Transferir inventario de {String(initial.concentration)}
-              </button>
               <button
                 type="button"
                 className="danger"
@@ -1063,42 +1464,16 @@ export default function MobileOffice({
             </>
           )}
         </form>
-        {initial && isAdmin && (
-          <div className="inventory-locations">
-            <h3>Existencias de {String(initial.concentration)}</h3>
-            {locations.map((x) => (
-              <button
-                key={String(x.id)}
-                onClick={() => locationAdjust(initial, String(x.location))}
-              >
-                <span>{String(x.location)}</span>
-                <b className={Number(x.quantity) < 0 ? "negative" : ""}>
-                  {String(x.quantity)}
-                </b>
-              </button>
-            ))}
-            <h3>Movimientos recientes</h3>
-            {moves.map((x) => (
-              <p key={String(x.id)}>
-                <b>
-                  {Number(x.change) > 0 ? "+" : ""}
-                  {String(x.change)}
-                </b>{" "}
-                {String(x.reason)}
-                <small>{String(x.created_at).slice(0, 10)}</small>
-              </p>
-            ))}
-          </div>
-        )}
       </>
     );
   }
   function ClientForm({ initial }: { initial: Row | null }) {
+    const [fixedDiscountPct,setFixedDiscountPct]=useState(String(initial?.fixed_discount_pct||""));
     return (
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          post("saveClient", { ...val(e.currentTarget), id: initial?.id });
+          post("saveClient", { ...val(e.currentTarget), loyaltyEnabled:new FormData(e.currentTarget).get("loyaltyEnabled")==="on", id: initial?.id });
         }}
         className="mobile-form"
       >
@@ -1110,6 +1485,9 @@ export default function MobileOffice({
         />
         <Field name="lastName" label="Apellido" value={initial?.last_name} />
         <Field name="phone" label="Teléfono" value={initial?.phone} />
+        <label>Referido por<select name="referredByClientId" defaultValue={String(initial?.referred_by_client_id||"")}><option value="">Sin referido</option>{clients.filter(c=>c.id!==initial?.id).map(c=><option key={String(c.id)} value={String(c.id)}>{String(c.code)} · {String(c.first_name)} {String(c.last_name)}</option>)}</select></label>
+        <label>Descuento fijo exclusivo (%)<input name="fixedDiscountPct" type="number" min="0" max="100" step="any" value={fixedDiscountPct} placeholder="0" onChange={event=>setFixedDiscountPct(event.target.value)}/><small>Se aplicará automáticamente al facturar a este cliente y sustituirá el descuento de lealtad.</small></label>
+        <label className="check-row"><input name="loyaltyEnabled" type="checkbox" defaultChecked={initial?.loyalty_enabled===undefined||Number(initial?.loyalty_enabled)===1}/> Participa en el programa de lealtad</label>
         <button>Guardar cliente</button>
         {initial && isAdmin && (
           <button
@@ -1142,14 +1520,22 @@ export default function MobileOffice({
       [cart, setCart] = useState<Row[]>(starting),
       [product, setProduct] = useState(""),
       [sellerId, setSellerId] = useState(String(initial?.seller_id || (!isAdmin ? access.teamId || "" : ""))),
-      [quantity, setQuantity] = useState(1),
+      [quantity, setQuantity] = useState("1"),
       [clientId, setClientId] = useState(String(initial?.client_id || "")),
+      [clientSearch, setClientSearch] = useState(() => {
+        const client = clients.find((item) => String(item.id) === String(initial?.client_id || ""));
+        return client ? `${String(client.first_name)} ${String(client.last_name)} · ${String(client.code)}` : "";
+      }),
       [quickOpen, setQuickOpen] = useState(false),
       [quickFirst, setQuickFirst] = useState(""),
       [quickLast, setQuickLast] = useState(""),
       [quickPhone, setQuickPhone] = useState(""),
       [quickClient, setQuickClient] = useState<Row | null>(null),
-      [savingClient, setSavingClient] = useState(false);
+      [savingClient, setSavingClient] = useState(false),
+      [manualDiscountType, setManualDiscountType] = useState(String(initial?.manual_discount_type || "Porcentaje")),
+      [manualDiscountValue, setManualDiscountValue] = useState(() => initial ? String(Number(initial.manual_discount_value || 0)) : ""),
+      [penPromptOpen, setPenPromptOpen] = useState(false),
+      [skipPenPrompt, setSkipPenPrompt] = useState(false);
     const chosen = products.find((p) => String(p.id) === product),
       seller = team.find((x) => String(x.id) === sellerId),
       available = balances
@@ -1159,10 +1545,10 @@ export default function MobileOffice({
             String(x.location) === `VENDEDOR:${sellerId}`,
         )
         .reduce((s, x) => s + Number(x.quantity || 0), 0),
-      gross = cart.reduce(
-        (s, x) => s + Number(x.quantity) * Number(x.unitPrice),
-        0,
-      );
+      selectedClient=clients.find(c=>String(c.id)===clientId),fixedDiscountRate=Number(selectedClient?.fixed_discount_pct||0),loyaltyRate=fixedDiscountRate>0?0:Number(initial?.loyalty_discount_pct||selectedClient?.loyalty_next_discount_pct||0),invoiceRate=Number(initial?.invoice_exchange_rate||currentExchangeRate.rate||60),
+      previewLines=cart.map(item=>{const itemProduct=products.find(candidate=>Number(candidate.id)===Number(item.productId)),qty=Math.max(1,Number(item.quantity)||1),match=String(itemProduct?.concentration||"").match(/(\d+(?:[.,]\d+)?)\s*mg/i),wholesaleRate=Number(itemProduct?.wholesale_mg_price||0),wholesaleMinimum=Number(itemProduct?.wholesale_minimum||0),wholesale=Boolean(match&&wholesaleRate>0&&wholesaleMinimum>0&&qty>=wholesaleMinimum),unitPrice=wholesale&&match?wholesaleRate*Number(match[1].replace(",",".")):Number(item.unitPrice||0);return{...item,qty,unitPrice,itemProduct}}),
+      gross=previewLines.reduce((sum,item)=>sum+item.qty*item.unitPrice,0),fixedDiscount=gross*Math.max(0,fixedDiscountRate)/100,afterFixed=Math.max(0,gross-fixedDiscount),manualValue=Math.max(0,Number(manualDiscountValue)||0),manualDiscount=Math.min(afterFixed,manualDiscountType==="Monto"?manualValue:afterFixed*manualValue/100),afterManual=Math.max(0,afterFixed-manualDiscount),automaticLoyalty=manualValue<=.005&&fixedDiscountRate<=.005&&loyaltyRate>0,loyaltyDiscount=automaticLoyalty?afterManual*loyaltyRate/100:0,totalBeforeBac=Math.max(0,afterManual-loyaltyDiscount),
+      isBacProduct=(candidate:Row|undefined)=>Boolean(candidate&&/bac water|bacteriost/i.test(`${String(candidate.name||"")} ${String(candidate.category||"")}`)),isPenProduct=(candidate:Row|undefined)=>Boolean(candidate&&/\bpen\b|pluma|prellenad|pre-filled/i.test(`${String(candidate.name||"")} ${String(candidate.category||"")} ${String(candidate.concentration||"")}`)),containsInjectable=previewLines.some(item=>Boolean(item.itemProduct?.complement_enabled)),containsPen=previewLines.some(item=>isPenProduct(item.itemProduct)),complementRequired=previewLines.reduce((map,item)=>{const complementId=Number(item.itemProduct?.complement_product_id||0),perUnit=Math.max(1,Number(item.itemProduct?.complement_quantity||1));if(item.itemProduct?.complement_enabled&&complementId)map.set(complementId,(map.get(complementId)||0)+item.qty*perUnit);return map},new Map<number,number>()),missingComplements=[...complementRequired].map(([complementId,required])=>{const complement=products.find(candidate=>Number(candidate.id)===complementId),existing=previewLines.filter(item=>Number(item.itemProduct?.id)===complementId).reduce((sum,item)=>sum+item.qty,0);return{product:complement,quantity:Math.max(0,required-existing)}}).filter(item=>item.product&&item.quantity>0),missingBac=missingComplements.filter(item=>isBacProduct(item.product)).reduce((sum,item)=>sum+item.quantity,0),freeBac=Boolean(bacRules.enabled)&&totalBeforeBac>Number(bacRules.threshold||200),autoBacSubtotal=0,previewTotal=Math.max(0,afterManual-loyaltyDiscount),previewDiscount=gross-previewTotal,previewDop=Math.round(previewTotal*invoiceRate/5)*5,availablePens=products.filter(candidate=>isPenProduct(candidate)&&stock(candidate.id)>0).sort((a,b)=>String(a.name).localeCompare(String(b.name),"es",{sensitivity:"base"}));
     const createQuickClient = async () => {
       if (!quickFirst.trim()) {
         setError("Escribe el nombre del cliente");
@@ -1196,17 +1582,22 @@ export default function MobileOffice({
       };
       setQuickClient(created);
       setClientId(String(result.id));
+      setClientSearch(`${quickFirst} ${quickLast} · ${String(result.code || "")}`.trim());
       setQuickOpen(false);
     };
     return (
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if(containsInjectable&&!containsPen&&availablePens.length&&!skipPenPrompt){setPenPromptOpen(true);return;}
+          if(missingComplements.length&&!freeBac){
+            const summary=missingComplements.map(item=>`${item.quantity} × ${String(item.product?.name)} ${String(item.product?.concentration||"")}`).join("\n");
+            const addComplements=window.confirm(`Este pedido tiene productos complementarios sugeridos:\n\n${summary}\n\nAceptar: agregarlos al pedido.\nCancelar: continuar y guardar sin agregarlos.`);
+            if(addComplements){setCart([...cart,...missingComplements.map(item=>({productId:item.product!.id,quantity:item.quantity,unitPrice:item.product!.normal_price||item.product!.price,unitCost:item.product!.unit_cost||0,name:item.product!.name}))]);return;}
+          }
           const f = val(e.currentTarget);
           post(initial ? "updateInvoice" : "createInvoice", {
             ...f,
-            progressiveEnabled:
-              new FormData(e.currentTarget).get("progressiveEnabled") === "on",
             id: initial?.id,
             number: initial?.number,
             items: cart,
@@ -1216,25 +1607,26 @@ export default function MobileOffice({
       >
         <div className="invoice-client-picker">
           <label>
-            Cliente
-            <select
-              name="clientId"
+            Buscar cliente por nombre
+            <input
+              list="invoice-client-options"
               required
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
-            >
-              <option value="">Seleccionar</option>
-              {clients.map((client) => (
-                <option key={String(client.id)} value={String(client.id)}>
-                  {String(client.code)} · {String(client.first_name)} {String(client.last_name)}
-                </option>
-              ))}
-              {quickClient && (
-                <option value={String(quickClient.id)}>
-                  {String(quickClient.code)} · {String(quickClient.first_name)} {String(quickClient.last_name)}
-                </option>
-              )}
-            </select>
+              value={clientSearch}
+              placeholder="Escribe el nombre del cliente"
+              onChange={(event) => {
+                const value = event.target.value;
+                setClientSearch(value);
+                const pool = quickClient ? [...clients, quickClient] : clients;
+                const match = pool.find((client) => `${String(client.first_name)} ${String(client.last_name)} · ${String(client.code)}` === value);
+                setClientId(match ? String(match.id) : "");
+              }}
+            />
+            <input type="hidden" name="clientId" value={clientId} />
+            <datalist id="invoice-client-options">
+              {[...clients, ...(quickClient ? [quickClient] : [])]
+                .sort((a, b) => `${String(a.first_name)} ${String(a.last_name)}`.localeCompare(`${String(b.first_name)} ${String(b.last_name)}`, "es", { sensitivity: "base" }))
+                .map((client) => <option key={String(client.id)} value={`${String(client.first_name)} ${String(client.last_name)} · ${String(client.code)}`} />)}
+            </datalist>
           </label>
           <button
             type="button"
@@ -1278,7 +1670,7 @@ export default function MobileOffice({
         <div className="cart-add">
           <select value={product} onChange={(e) => setProduct(e.target.value)}>
             <option value="">Producto</option>
-            {products.map((p) => (
+            {alphabeticalProducts.map((p) => (
               <option key={String(p.id)} value={String(p.id)}>
                 {String(p.name)} {String(p.concentration)}
               </option>
@@ -1290,9 +1682,8 @@ export default function MobileOffice({
               type="number"
               min="1"
               value={quantity}
-              onChange={(e) =>
-                setQuantity(Math.max(1, Number(e.target.value) || 1))
-              }
+              onChange={(e) => setQuantity(e.target.value)}
+              onBlur={() => { if (!quantity || Number(quantity) < 1) setQuantity("1"); }}
             />
             <small>
               {product && sellerId
@@ -1308,7 +1699,7 @@ export default function MobileOffice({
                 ...cart,
                 {
                   productId: chosen.id,
-                  quantity,
+                  quantity: Math.max(1, Number(quantity) || 1),
                   unitPrice: chosen.normal_price || chosen.price,
                   unitCost: chosen.unit_cost || 0,
                   name: chosen.name,
@@ -1325,14 +1716,15 @@ export default function MobileOffice({
             <input
               type="number"
               min="1"
-              value={Number(x.quantity)}
+              value={String(x.quantity ?? "")}
               onChange={(e) =>
                 setCart(
                   cart.map((y, k) =>
-                    k === n ? { ...y, quantity: Number(e.target.value) } : y,
+                    k === n ? { ...y, quantity: e.target.value } : y,
                   ),
                 )
               }
+              onBlur={() => setCart(cart.map((y,k)=>k===n&&(!String(y.quantity||"")||Number(y.quantity)<1)?{...y,quantity:"1"}:y))}
             />
             <b>{money(Number(x.quantity) * Number(x.unitPrice))}</b>
             <button
@@ -1344,55 +1736,34 @@ export default function MobileOffice({
           </div>
         ))}
         <div className="form-summary">
-          <span>Subtotal estimado</span>
-          <b>{money(gross)}</b>
+          <span>Subtotal estimado</span><b>{money(gross + autoBacSubtotal)}</b>
+          {fixedDiscount>0&&<><span>Descuento fijo del cliente ({fixedDiscountRate.toFixed(2).replace(/\.00$/,"")}%)</span><b>-{money(fixedDiscount)}</b></>}
+          {manualDiscount>0&&<><span>Descuento manual</span><b>-{money(manualDiscount)}</b></>}
+          {loyaltyDiscount>0&&<><span>Descuento de lealtad automático</span><b>-{money(loyaltyDiscount)}</b></>}
+          {missingComplements.length>0&&<><span>Complementos sugeridos</span><b>{freeBac&&missingBac>0?`${missingBac} Agua BAC sin costo`:missingComplements.map(item=>`${item.quantity} ${String(item.product?.name)}`).join(" · ")}</b></>}
+          <span>Descuento total</span><b>-{money(previewDiscount)}</b>
+          <strong>Total antes de facturar · tasa RD${invoiceRate.toFixed(2)}</strong>
+          <strong>{money(previewTotal)} · RD${previewDop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</strong>
         </div>
-        <label className="check-row">
-          <input name="progressiveEnabled" type="checkbox" /> Aplicar descuento
-          progresivo
-        </label>
-        <div className="form-pair">
-          <Field name="minQty" label="Desde unidades" type="number" value="2" />
-          <Field
-            name="minPct"
-            label="Descuento mínimo %"
-            type="number"
-            value="5"
-          />
-        </div>
-        <div className="form-pair">
-          <Field
-            name="maxQty"
-            label="Máximo en unidades"
-            type="number"
-            value="10"
-          />
-          <Field
-            name="maxPct"
-            label="Descuento máximo %"
-            type="number"
-            value="15"
-          />
-        </div>
+        {clientId&&<div className="loyalty-preview"><span>{fixedDiscountRate>0?"Descuento fijo exclusivo":automaticLoyalty?"Lealtad aplicada automáticamente":"Nivel de lealtad disponible"}</span><b>{(fixedDiscountRate>0?fixedDiscountRate:loyaltyRate).toFixed(0)}%</b>{fixedDiscountRate>0?<small>Este descuento sustituye el programa de lealtad.</small>:loyaltyRate>0&&!automaticLoyalty&&<small>El descuento manual sustituye la lealtad en esta factura.</small>}</div>}
         <label>
           Descuento manual
-          <select name="manualDiscountType">
+          <select name="manualDiscountType" value={manualDiscountType} onChange={event=>setManualDiscountType(event.target.value)}>
             <option>Porcentaje</option>
             <option>Monto</option>
           </select>
         </label>
-        <Field
-          name="manualDiscountValue"
-          label="Valor del descuento manual"
-          type="number"
-          value="0"
-        />
+        <label>Valor del descuento manual<input name="manualDiscountValue" type="number" min="0" step="any" value={manualDiscountValue} placeholder="0" onChange={event=>setManualDiscountValue(event.target.value)} onBlur={()=>{if(manualDiscountValue==="")setManualDiscountValue("0")}}/></label>
         <small>
           El precio mayorista se aplica automáticamente al alcanzar el mínimo
-          configurado y sustituye el descuento progresivo de esa línea.
+          configurado. El descuento manual sustituye la lealtad en esa factura.
         </small>
         <Field name="notes" label="Notas" value={initial?.notes} />
-        <button disabled={!cart.length}>Guardar factura</button>
+        <div className="invoice-form-actions">
+          <button type="button" className="cancel" onClick={() => { setModal(null); setSelected(null); }}>Cancelar</button>
+          <button disabled={!cart.length}>Guardar factura</button>
+        </div>
+        {penPromptOpen&&<div className="pen-order-prompt" role="dialog" aria-modal="true" aria-label="Agregar pluma inyectable"><div><small>COMPLEMENTO OPCIONAL</small><h3>Hay plumas disponibles</h3><p>¿Desea agregar alguna al pedido antes de guardar la factura?</p>{availablePens.map(pen=><button key={String(pen.id)} type="button" onClick={()=>{setCart([...cart,{productId:pen.id,quantity:1,unitPrice:pen.normal_price||pen.price,unitCost:pen.unit_cost||0,name:pen.name}]);setPenPromptOpen(false);setSkipPenPrompt(true)}}><span>{String(pen.name)} {String(pen.concentration||"")}</span><b>{money(pen.normal_price||pen.price)}</b></button>)}<button className="secondary" type="button" onClick={()=>{setSkipPenPrompt(true);setPenPromptOpen(false)}}>Continuar sin agregar pluma</button></div></div>}
       </form>
     );
   }
@@ -1400,7 +1771,11 @@ export default function MobileOffice({
     const history = payments.filter((x) => x.invoice_id === invoice.id);
     return (
       <div className="invoice-mobile-detail">
+        {isInvoiceOverdue(invoice) && (
+          <div className="invoice-overdue-notice" role="status">🔔 Esta factura lleva más de 15 días pendiente de pago.</div>
+        )}
         <b className="invoice-total">{money(invoice.total)}</b>
+        {Number(invoice.total_dop) > 0 && <div className="invoice-dop-total">RD${Number(invoice.total_dop).toLocaleString("en-US", { maximumFractionDigits: 0 })}<small>Tasa archivada: RD${Number(invoice.invoice_exchange_rate).toFixed(2)} por USD · {String(invoice.exchange_rate_date || "")}</small></div>}
         <p>
           {String(invoice.client_name)}
           <br />
@@ -1436,7 +1811,7 @@ export default function MobileOffice({
         <div className="invoice-actions">
           <button
             onClick={() =>
-              window.open(`/ptbr-mobile/invoices/${invoice.id}`, "_blank")
+              window.location.assign(`/ptbr-mobile/invoices/${invoice.id}`)
             }
           >
             Imprimir / PDF
@@ -1458,14 +1833,14 @@ export default function MobileOffice({
                 </button>
               )}
               <button
-                className="danger"
+                className="trash-button"
+                title="Eliminar factura"
+                aria-label="Eliminar factura"
                 onClick={() =>
                   confirm("¿Eliminar esta factura y devolver el inventario?") &&
                   post("deleteInvoice", { invoiceId: invoice.id })
                 }
-              >
-                Eliminar
-              </button>
+              ><TrashIcon/></button>
             </>
           )}
         </div>
@@ -1473,7 +1848,10 @@ export default function MobileOffice({
     );
   }
   function PaymentForm({ invoice }: { invoice: Row }) {
-    const [currency, setCurrency] = useState("USD");
+    const invoiceRate = Number(invoice.invoice_exchange_rate || currentExchangeRate.rate || 60),
+      balanceDop = Math.round(Number(invoice.balance || 0) * invoiceRate / 5) * 5,
+      [currency, setCurrency] = useState("USD"),
+      [amount, setAmount] = useState(Number(invoice.balance || 0).toFixed(2));
     return (
       <form
         className="mobile-form"
@@ -1494,27 +1872,21 @@ export default function MobileOffice({
           <select
             name="currency"
             value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
+            onChange={(e) => {const next=e.target.value;setCurrency(next);setAmount(next === "DOP" ? balanceDop.toFixed(2) : Number(invoice.balance || 0).toFixed(2));}}
           >
             <option value="USD">USD · Dólares</option>
             <option value="DOP">DOP · Pesos dominicanos</option>
           </select>
         </label>
-        <Field
-          name="originalAmount"
-          label={
-            currency === "DOP" ? "Monto recibido RD$" : "Monto recibido US$"
-          }
-          type="number"
-          required
-        />
-        <Field
-          name="exchangeRate"
-          label="Tasa DOP por USD"
-          type="number"
-          required
-          value={currency === "DOP" ? "60" : "1"}
-        />
+        <label>
+          {currency === "DOP" ? "Monto recibido RD$" : "Monto recibido US$"}
+          <input name="originalAmount" type="number" min="0" step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} />
+        </label>
+        <label>
+          Tasa archivada en la factura
+          <input name="exchangeRate" type="number" readOnly value={invoiceRate.toFixed(2)} />
+          <small>Esta tasa no cambia aunque el pago se realice otro día.</small>
+        </label>
         <label>
           Método
           <select name="method">
@@ -1548,7 +1920,7 @@ export default function MobileOffice({
         <Select
           name="productId"
           label="Producto"
-          items={products}
+          items={alphabeticalProducts}
           render={(x) => `${x.name} ${x.concentration}`}
         />
         <label>
@@ -1630,14 +2002,14 @@ export default function MobileOffice({
         )}
         {Number(initial.paid || 0) === 0 && (
           <button
-            className="standalone-danger"
+            className="trash-button standalone-trash"
+            title="Eliminar retiro"
+            aria-label="Eliminar retiro"
             onClick={() =>
               confirm("¿Eliminar este retiro y devolver el inventario?") &&
               post("deleteWithdrawal", { id: initial.id })
             }
-          >
-            Eliminar retiro
-          </button>
+          ><TrashIcon/></button>
         )}
       </div>
     );
@@ -1714,11 +2086,36 @@ export default function MobileOffice({
     );
   }
   function TeamForm({ initial }: { initial: Row | null }) {
+    const [savingMember, setSavingMember] = useState(false);
+    const [memberError, setMemberError] = useState("");
     return (
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          post("saveTeam", { ...val(e.currentTarget), id: initial?.id });
+          if (savingMember) return;
+          setSavingMember(true);
+          setMemberError("");
+          const values = val(e.currentTarget), accessEmail = String(values.accessEmail || "").trim();
+          delete values.accessEmail;
+          try {
+            const memberResponse = await fetch("/api/mobile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "saveTeam", data: { ...values, id: initial?.id } }) });
+            const memberResult = await memberResponse.json();
+            if (!memberResponse.ok) { setMemberError(memberResult.error || "No se pudo guardar el integrante"); return; }
+            if (accessEmail) {
+              const accessResponse = await fetch("/api/desktop-users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "upsert", email: accessEmail, teamId: memberResult.id }) });
+              const accessResult = await accessResponse.json();
+              if (!accessResponse.ok) { setMemberError(`El integrante se guardó, pero no se pudo crear su acceso: ${accessResult.error || "error desconocido"}`); await load(); return; }
+              alert(accessResult.emailSent ? accessResult.message : `${accessResult.message}\n\nContraseña temporal: ${accessResult.temporaryPassword}`);
+            }
+            await fetch("/api/mobile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "touchRevision", data: {} }) });
+            setModal(null);
+            setSelected(null);
+            await load();
+          } catch {
+            setMemberError("No se pudo conectar para guardar el integrante.");
+          } finally {
+            setSavingMember(false);
+          }
         }}
         className="mobile-form"
       >
@@ -1757,8 +2154,11 @@ export default function MobileOffice({
           />
         </div>
         <Field name="notes" label="Notas" value={initial?.notes} />
-        <button>Guardar integrante</button>
-        {initial && (
+        <Field name="accessEmail" label="Correo para acceso (opcional)" type="email" />
+        <small>Si indicas un correo, se crearán las credenciales y se enviará una contraseña temporal. El usuario verá el mismo catálogo con su inventario personal comenzando en cero.</small>
+        {memberError && <div className="product-form-error">{memberError}</div>}
+        <button disabled={savingMember}>{savingMember ? "Guardando…" : "Guardar integrante"}</button>
+        {initial && Boolean(initial.can_edit) && (
           <button
             type="button"
             className="danger"
@@ -1852,14 +2252,14 @@ export default function MobileOffice({
         {initial && (
           <button
             type="button"
-            className="danger"
+            className="trash-button"
+            title="Eliminar compra"
+            aria-label="Eliminar compra"
             onClick={() =>
               confirm("¿Eliminar compra?") &&
               post("deletePurchase", { id: initial.id })
             }
-          >
-            Eliminar
-          </button>
+          ><TrashIcon/></button>
         )}
       </form>
     );
@@ -1951,7 +2351,7 @@ export default function MobileOffice({
         <Select
           name="productId"
           label="Producto"
-          items={products}
+          items={alphabeticalProducts}
           render={(x) => `${x.name} ${x.concentration}`}
           value={initial?.product_id}
         />
@@ -2009,21 +2409,21 @@ export default function MobileOffice({
             <button
               type="button"
               onClick={() =>
-                window.open(`/ptbr-mobile/protocols/${initial.id}`, "_blank")
+                window.location.assign(`/ptbr-mobile/protocols/${initial.id}`)
               }
             >
               Imprimir / Guardar PDF
             </button>
             <button
               type="button"
-              className="danger"
+              className="trash-button"
+              title="Eliminar protocolo"
+              aria-label="Eliminar protocolo"
               onClick={() =>
                 confirm("¿Eliminar protocolo?") &&
                 post("deleteProtocol", { id: initial.id })
               }
-            >
-              Eliminar
-            </button>
+            ><TrashIcon/></button>
           </>
         )}
       </form>
@@ -2048,13 +2448,83 @@ function Modal({
       >
         <header>
           <div>
-            <span>NUEVO REGISTRO</span>
+            <span>{title === "BAC Lab" ? "HERRAMIENTA INTERNA" : "NUEVO REGISTRO"}</span>
             <h2>{title}</h2>
           </div>
           <button onClick={close}>×</button>
         </header>
         {children}
       </section>
+    </div>
+  );
+}
+function BacLab() {
+  const [mode, setMode] = useState<"final" | "water">("final");
+  const [amount, setAmount] = useState("10");
+  const parsed = Number(amount.replace(",", "."));
+  const valid = Number.isFinite(parsed) && parsed > 0;
+  const finalTotal = valid
+    ? mode === "water"
+      ? parsed / 0.9909
+      : parsed
+    : 0;
+  const water = valid
+    ? mode === "water"
+      ? parsed
+      : finalTotal * 0.9909
+    : 0;
+  const alcohol = valid ? finalTotal - water : 0;
+  const volume = (value: number) =>
+    valid
+      ? `${value.toLocaleString("en-US", {
+          minimumFractionDigits: 3,
+          maximumFractionDigits: 3,
+        })} mL`
+      : "—";
+
+  return (
+    <div className="bac-lab">
+      <p>
+        Calcula las proporciones para preparar agua bacteriostática con una
+        concentración final de alcohol bencílico de <b>0.91%</b>.
+      </p>
+      <div className="bac-lab-controls">
+        <label>
+          Calcular a partir de
+          <select value={mode} onChange={(event) => setMode(event.target.value as "final" | "water")}>
+            <option value="final">Volumen final deseado</option>
+            <option value="water">Agua estéril disponible</option>
+          </select>
+        </label>
+        <label>
+          Cantidad (mL)
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0.001"
+            step="0.001"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </label>
+      </div>
+      <div className="bac-lab-results">
+        <article><span>Agua estéril</span><b>{volume(water)}</b></article>
+        <article>
+          <span>Alcohol bencílico</span><b>{volume(alcohol)}</b>
+          <small>0.91% del volumen final</small>
+        </article>
+        <article><span>Volumen final</span><b>{volume(finalTotal)}</b></article>
+      </div>
+      <div className={`bac-lab-formula ${valid ? "" : "invalid"}`}>
+        {valid
+          ? `${volume(water)} de agua + ${volume(alcohol)} de alcohol bencílico = ${volume(finalTotal)}`
+          : "Escribe una cantidad mayor que cero."}
+      </div>
+      <p className="bac-lab-note">
+        Cálculo volumétrico únicamente. Utiliza técnica aséptica, insumos aptos
+        y los procedimientos autorizados para tu operación.
+      </p>
     </div>
   );
 }
@@ -2072,22 +2542,6 @@ function Card({
       <span>{label}</span>
       <b>{value}</b>
     </article>
-  );
-}
-function Quick({
-  icon,
-  label,
-  action,
-}: {
-  icon: string;
-  label: string;
-  action: () => void;
-}) {
-  return (
-    <button onClick={action}>
-      <i>{icon}</i>
-      <span>{label}</span>
-    </button>
   );
 }
 function FlowAction({
@@ -2217,3 +2671,4 @@ function Select({
     </label>
   );
 }
+

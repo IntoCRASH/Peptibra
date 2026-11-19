@@ -9,7 +9,7 @@ const unavailable="/product-image-unavailable.png";
 const categoriesEn:Record<string,string>={"Péptido":"Peptide","Accesorio":"Accessory","Agua bacteriostática":"Bacteriostatic water"};
 const categoryEn=(value:string)=>categoriesEn[value]||value;
 const presentationEn=(value:string)=>value.replace(/\bviales?\b/gi,"vials");
-const aliases:Record<string,string>={"Dual Receptor Agonist":"tirzepatide","Triple Receptor Agonist":"glp3-reta"};
+const aliases:Record<string,string>={"Dual Receptor Agonist":"tirzepatide","GLP1/GIP Dual Receptor Agonist":"tirzepatide","Triple Receptor Agonist":"glp3-reta","GLP1/GIP/GCG Triple Receptor Agonist":"glp3-reta"};
 const historicalPhoto=(name:string)=>editorial.find(p=>p.slug===(aliases[name]||"")||p.name.toLowerCase()===name.toLowerCase())?.image||unavailable;
 
 export default function HomeCatalog(){

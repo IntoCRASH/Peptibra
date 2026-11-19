@@ -4,7 +4,7 @@ import SiteHeader from "../SiteHeader";
 import VerificationGate from "../VerificationGate";
 import ContactForm from "./ContactForm";
 
-export default function ContactPage(){return <main className="pb-site"><VerificationGate/><SiteHeader/>
+export default function ContactPage(){return <main className="pb-site pb-public-new"><VerificationGate/><SiteHeader/>
   <section className="pb-contact-hero"><span className="pb-kicker">PEPTIBRA SUPPORT</span><h1>How can we help?</h1><p>Contact us for product information, batch-specific documentation, COAs, catalog availability, or general research account questions.</p><div><Link href="/products">Explore catalog</Link><Link href="/faq">Visit FAQ</Link></div></section>
   <section className="pb-contact-layout">
     <aside className="pb-contact-info">
@@ -14,5 +14,6 @@ export default function ContactPage(){return <main className="pb-site"><Verifica
     </aside>
     <ContactForm/>
   </section>
-  <footer><Image src="/peptibra-logo-dark.png" width={1774} height={887} alt="Peptibra" unoptimized/><p>Products intended exclusively for research purposes. Not for human consumption.</p><a href="mailto:peptibra@gmail.com">peptibra@gmail.com</a></footer>
+  <footer><Image src="/brand/peptibra-logo-dark.svg" width={980} height={270} alt="Peptibra" unoptimized/><p>Products intended exclusively for research purposes. Not for human consumption.</p><a href="mailto:peptibra@gmail.com">peptibra@gmail.com</a></footer>
 </main>}
+

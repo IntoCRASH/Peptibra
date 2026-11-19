@@ -13,7 +13,7 @@ const authorized = (request: Request, env: Env) => {
   return mismatch === 0;
 };
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") return json({ ok: true, service: "peptibra-api" });
@@ -54,3 +54,5 @@ export default {
     }
   },
 };
+
+export default worker;

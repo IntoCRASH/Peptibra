@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment -- Cloudflare supplies this virtual module at runtime. */
+// @ts-nocheck -- Cloudflare supplies this virtual module only in its worker runtime.
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./schema";

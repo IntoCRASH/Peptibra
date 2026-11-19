@@ -1,7 +1,7 @@
 import { getAuthorizedUser } from "@/app/chatgpt-auth";
 import { cloudDb } from "@/lib/cloudflare/supabase-compat";
 
-const tables=["calculations","products","product_profiles","inventory_balances","inventory_movements","team","clients","invoices","invoice_items","payments","cash_movements","suppliers","purchases","supplier_payments","protocols","internal_withdrawals","internal_withdrawal_payments","legacy_sales","app_settings"];
+const tables=["calculations","products","product_profiles","inventory_balances","inventory_movements","inventory_lots","inventory_lot_movements","invoice_item_lots","loyalty_rewards","audit_log","team","clients","invoices","invoice_items","payments","cash_movements","suppliers","purchases","supplier_payments","protocols","internal_withdrawals","internal_withdrawal_payments","legacy_sales","app_settings"];
 const cloud=()=>cloudDb;
 
 export async function GET(){const user=await getAuthorizedUser();if(user?.role!=="admin")return Response.json({error:"Solo el administrador puede exportar respaldos"},{status:403});try{const s=cloud(),entries=await Promise.all(tables.map(async table=>{const {data,error}=await s.from(table).select("*");if(error)throw error;return[table,data||[]]}));return Response.json({format:"PEPTIBRA-CLOUD-BACKUP",version:1,createdAt:new Date().toISOString(),tables:Object.fromEntries(entries)},{headers:{"content-disposition":`attachment; filename="Peptibra-Web-${new Date().toISOString().slice(0,10)}.json"`}})}catch(error){return Response.json({error:error instanceof Error?error.message:"No se pudo exportar"},{status:500})}}

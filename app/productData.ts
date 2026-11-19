@@ -29,12 +29,12 @@ export const products: CatalogProduct[] = [
     researchFocus: ["Investigación de péptidos de cobre", "Caracterización de muestras", "Evaluación de identidad y pureza"],
   },
   {
-    slug: "tirzepatide", name: "Tirzepatide", dose: "20 mg", category: "Metabolic Research", image: "/products/tirzepatide-20mg.png", cap: "Negra", format: "Polvo liofilizado", status: "Backordered", coaStatus: "Documentación en revisión",
+    slug: "tirzepatide", name: "GLP1/GIP Dual Receptor Agonist", dose: "20 mg", category: "Metabolic Research", image: "/products/tirzepatide-20mg.png", cap: "Negra", format: "Polvo liofilizado", status: "Backordered", coaStatus: "Documentación disponible",
     summary: "Compuesto de investigación metabólica incluido para consulta de presentación, disponibilidad y documentación.",
     researchFocus: ["Investigación de receptores in vitro", "Caracterización analítica", "Consulta documental por lote"],
   },
   {
-    slug: "glp3-reta", name: "GLP-3 Reta", dose: "20 mg", category: "Triple Receptor Research", image: "/products/glp3-reta-20mg.png", cap: "Marrón", format: "Polvo liofilizado", status: "Backordered", coaStatus: "Documentación en revisión",
+    slug: "glp3-reta", name: "GLP1/GIP/GCG Triple Receptor Agonist", dose: "20 mg", category: "Triple Receptor Research", image: "/products/glp3-reta-20mg.png", cap: "Marrón", format: "Polvo liofilizado", status: "Backordered", coaStatus: "Documentación disponible",
     summary: "Compuesto para investigación de triple receptor, presentado como parte del catálogo documentado de Peptibra.",
     researchFocus: ["Investigación multirreceptor in vitro", "Evaluación de identidad", "Revisión de documentación analítica"],
   },

@@ -8,11 +8,11 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     background_color: "#fbfaf7",
-    theme_color: "#fbfaf7",
+    theme_color: "#ef003f",
     icons: [
-      { src: "/icons/peptibra-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/peptibra-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/peptibra-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/brand/peptibra-mark-192.png?v=impulso", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/brand/peptibra-mark-512.png?v=impulso", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/brand/peptibra-mark-512.png?v=impulso", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

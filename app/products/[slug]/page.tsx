@@ -5,6 +5,11 @@ import SiteHeader from "../../SiteHeader";
 import VerificationGate from "../../VerificationGate";
 import { getProduct, products } from "../../productData";
 
+const coaByProduct:Record<string,{purity:string;lot:string;href:string}>={
+  tirzepatide:{purity:"99.53%",lot:"063026",href:"/coas/tirzepatide-20mg-lot-063026.pdf"},
+  "glp3-reta":{purity:"99.94%",lot:"082026",href:"/coas/retatrutide-20mg-lot-082026.pdf"},
+};
+
 export function generateStaticParams(){return products.map(product=>({slug:product.slug}))}
 
 export default async function ProductPage({params}:{params:Promise<{slug:string}>}){
@@ -12,18 +17,21 @@ export default async function ProductPage({params}:{params:Promise<{slug:string}
   const product=getProduct(slug);
   if(!product) notFound();
   const subject=encodeURIComponent(`Consulta sobre ${product.name} ${product.dose}`);
+  const coa=coaByProduct[product.slug];
   return <main className="pb-site"><VerificationGate/><SiteHeader/>
     <nav className="pb-product-breadcrumb" aria-label="Ruta de navegación"><Link href="/">Inicio</Link><span>/</span><Link href="/products">Catálogo</Link><span>/</span><b>{product.name}</b></nav>
     <section className="pb-product-detail">
       <div className="pb-product-detail-image"><span>{product.status}</span><Image src={product.image} width={1254} height={1254} alt={`Vial Peptibra ${product.name} ${product.dose}`} unoptimized priority/></div>
       <div className="pb-product-detail-copy"><span className="pb-kicker">{product.category}</span><h1>{product.name}</h1><p className="pb-product-lead">{product.summary}</p>
         <dl><div><dt>Presentación</dt><dd>{product.dose}</dd></div><div><dt>Formato</dt><dd>{product.format}</dd></div><div><dt>Identificación</dt><dd>Tapa {product.cap}</dd></div><div><dt>Documentación</dt><dd>{product.coaStatus}</dd></div></dl>
-        <div className="pb-product-ctas"><a className="pb-btn primary" href={`mailto:peptibra@gmail.com?subject=${subject}`}>Solicitar información →</a><Link className="pb-btn secondary" href="/faq">Cómo interpretar los COAs</Link></div>
+        {coa&&<div className="pb-product-purity"><span>PUREZA VERIFICADA</span><strong>{coa.purity}</strong><small>Identidad confirmada · Lote {coa.lot}</small></div>}
+        <div className="pb-product-ctas">{coa?<a className="pb-btn primary" href={coa.href} target="_blank" rel="noreferrer">Abrir COA →</a>:<a className="pb-btn primary" href={`mailto:peptibra@gmail.com?subject=${subject}`}>Solicitar información →</a>}<Link className="pb-btn secondary" href="/faq">Cómo interpretar los COAs</Link></div>
         <small className="pb-research-notice">Exclusivamente para investigación in vitro y uso controlado de laboratorio. No apto para consumo humano o veterinario.</small>
       </div>
     </section>
-    <section className="pb-product-info-grid"><article><span className="pb-kicker">ÁREAS DE CONSULTA</span><h2>Contexto de investigación</h2><ul>{product.researchFocus.map(item=><li key={item}>{item}</li>)}</ul></article><article><span className="pb-kicker">TRAZABILIDAD</span><h2>Documentación por lote</h2><p>Peptibra organiza la evidencia disponible junto al producto que representa. Solicita el lote vigente para consultar su documentación específica.</p><a href={`mailto:peptibra@gmail.com?subject=${subject}`}>Consultar lote vigente →</a></article></section>
+    <section className="pb-product-info-grid"><article><span className="pb-kicker">ÁREAS DE CONSULTA</span><h2>Contexto de investigación</h2><ul>{product.researchFocus.map(item=><li key={item}>{item}</li>)}</ul></article><article><span className="pb-kicker">TRAZABILIDAD</span><h2>Documentación por lote</h2><p>Peptibra organiza la evidencia disponible junto al producto que representa. El documento publicado corresponde al lote indicado.</p>{coa?<a href={coa.href} target="_blank" rel="noreferrer">Abrir reporte del lote {coa.lot} →</a>:<a href={`mailto:peptibra@gmail.com?subject=${subject}`}>Consultar lote vigente →</a>}</article></section>
     <section className="pb-product-back"><Link href="/products">← Volver al catálogo completo</Link></section>
-    <footer><Image src="/peptibra-logo-dark.png" width={1774} height={887} alt="Peptibra" unoptimized/><p>Catálogo informativo para fines de investigación.</p><a href="mailto:peptibra@gmail.com">peptibra@gmail.com</a></footer>
+    <footer><Image src="/brand/peptibra-logo-dark.svg" width={980} height={270} alt="Peptibra" unoptimized/><p>Catálogo informativo para fines de investigación.</p><a href="mailto:peptibra@gmail.com">peptibra@gmail.com</a></footer>
   </main>
 }
+

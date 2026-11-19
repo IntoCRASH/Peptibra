@@ -10,7 +10,7 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const query = useSearchParams();
-  const next = query.get("next") || "/ptbr-mobile";
+  const next = query.get("next") || "/office";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,7 +26,7 @@ function LoginContent() {
       setLoading(false);
       return;
     }
-    window.location.assign(result.mustChangePassword ? "/ptbr-mobile/settings?first=1" : next);
+    window.location.assign(result.mustChangePassword ? "/office/settings?first=1" : next);
   }
 
   async function recover() {
@@ -42,15 +42,15 @@ function LoginContent() {
     <main className="login-page">
       <form onSubmit={submit}>
         <div className="login-brand">
-          <Image src="/peptibra-logo-original.png" width={1774} height={887} alt="Peptibra Peptide Depot" priority />
+          <Image src="/brand/peptibra-logo-dark.svg" width={980} height={270} alt="Peptibra" unoptimized priority />
         </div>
-        <span>RESTRICTED ACCESS</span>
-        <h1>Virtual office</h1>
-        <p className="login-intro">Secure Peptibra management from any device.</p>
-        <label>Authorized email<input name="email" type="email" value={email} onChange={(event)=>setEmail(event.target.value)} autoComplete="username" required /></label>
-        <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
-        <button disabled={loading}>{loading ? "Signing in…" : "Sign in"}</button>
-        <button className="login-secondary" type="button" disabled={loading} onClick={recover}>Forgot my password</button>
+        <span>ACCESO SEGURO</span>
+        <h1>Oficina Peptibra</h1>
+        <p className="login-intro">Una sola plataforma para administrar tu operación desde Windows, navegador o móvil.</p>
+        <label>Correo autorizado<input name="email" type="email" value={email} onChange={(event)=>setEmail(event.target.value)} autoComplete="username" required /></label>
+        <label>Contraseña<input name="password" type="password" autoComplete="current-password" required /></label>
+        <button disabled={loading}>{loading ? "Ingresando…" : "Iniciar sesión"}</button>
+        <button className="login-secondary" type="button" disabled={loading} onClick={recover}>Olvidé mi contraseña</button>
         {notice && <p className="login-notice">{notice}</p>}
         {error && <p className="login-error">{error}</p>}
       </form>

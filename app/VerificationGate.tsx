@@ -61,10 +61,10 @@ export default function VerificationGate() {
         <LanguageSwitcher compact/>
         <div className="verification-logo" aria-label="Peptibra · Peptide Depot">
           <Image
-            src="/peptibra-logo-dark.png"
-            width={1774}
-            height={887}
-            alt="Peptibra · Peptide Depot"
+            src="/brand/peptibra-logo-light.svg"
+            width={980}
+            height={270}
+            alt="Peptibra"
             unoptimized
             priority
           />

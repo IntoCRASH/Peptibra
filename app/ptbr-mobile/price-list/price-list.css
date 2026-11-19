@@ -4,6 +4,7 @@
   gap: 6px 10px;
   margin-top: 12px;
 }
+.price-list-intro{display:flex;align-items:center;justify-content:space-between;margin:0 0 2mm;padding:1.5mm 2.5mm;border-left:1mm solid #bd1238;background:#f8eef1}.price-list-intro span{color:#95102e;font-size:6.2pt;font-weight:900;letter-spacing:.12em}.price-list-intro p{margin:0;color:#626a72;font-size:6.2pt}.price-sheet .price-grid>article{break-inside:avoid;overflow:visible}.price-sheet .price-grid>article>div{min-width:0}.price-sheet .available-presentations{color:#7b3344;font-weight:800;letter-spacing:.02em}
 .price-grid .available-presentations{display:block;margin:4px 0 10px;color:#4f5862;font-size:10px;line-height:1.4}.price-grid article>div>span{display:block;margin-top:8px;color:#717983;font-size:10px;font-weight:700}
 .price-grid .family-price-list strong {
   display: flex;
@@ -14,7 +15,7 @@
   padding: 6px 8px;
   border-radius: 7px;
   background: #f8eef1;
-  color: #a51537;
+  color: #bd1238;
   font-size: 13px;
   white-space: nowrap;
 }
@@ -24,4 +25,9 @@
   font-size: 10px;
   font-weight: 800;
 }
+.price-sheet .family-price-list{grid-template-columns:1fr;gap:3px;margin-top:7px}.price-sheet .family-price-list strong{min-width:0;padding:4px 7px}.price-sheet .family-price-list strong span{white-space:nowrap}
+.price-sheet .price-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);align-items:stretch;gap:2.3mm;margin-top:0}.price-sheet .price-grid>article{display:block;min-height:0;padding:2mm;border-radius:2.2mm}.price-sheet .price-grid>article>img,.price-sheet .price-grid>article>i{float:right;width:18mm;height:22mm;margin:0 0 1.2mm 1.7mm;object-fit:contain;border-radius:1.5mm}.price-sheet .price-grid>article>div>b{display:block;min-height:7mm;font-size:8.8pt;line-height:1.08}.price-sheet .price-grid p{display:block;overflow:visible;margin:1.2mm 0;font-size:5.65pt;line-height:1.24;white-space:normal}.price-sheet .available-presentations{clear:both;margin:.9mm 0 1.2mm;font-size:5.55pt;line-height:1.15}.price-sheet .family-price-list{clear:both;gap:.85mm;margin-top:1.2mm}.price-sheet .family-price-list strong{padding:1mm 1.3mm;border-radius:1.4mm;font-size:6.8pt;line-height:1.08}.price-sheet .family-price-list strong span{font-size:5.75pt}
+.pdf-capture-mode .price-sheet .price-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:2.3mm!important}.pdf-capture-mode .price-sheet .price-grid>article{display:block!important}.pdf-capture-mode .price-sheet .price-grid>article>img,.pdf-capture-mode .price-sheet .price-grid>article>i{float:right!important;width:18mm!important;height:22mm!important}
+.price-coa{display:grid;grid-template-columns:17mm 1fr auto;align-items:center;gap:3mm;margin-top:2mm;padding:2mm 3mm;border-radius:2mm;background:#20252b;color:#fff}.price-coa>img{width:17mm;height:17mm;padding:1mm;background:#fff}.price-coa small{color:#f07c98;font-size:5.2pt;font-weight:900;letter-spacing:.14em}.price-coa h2{margin:.5mm 0;color:#fff;font-size:8.4pt;line-height:1}.price-coa p{margin:0;color:#d7dbe0;font-size:5pt;line-height:1.2}.price-coa>a{color:#fff;text-align:right;font-size:5.1pt;line-height:1.25}.price-coa>a b{color:#f07c98;font-size:5.4pt}
+.price-loyalty{display:grid;grid-template-columns:.75fr 1.8fr;gap:3mm;margin-top:2mm;padding:2mm 3mm;border:1px solid #dfc8ce;border-left:1mm solid #bd1238;border-radius:2mm;background:#fff7f9}.price-loyalty small{color:#bd1238;font-size:5.4pt;font-weight:900;letter-spacing:.14em}.price-loyalty h2{margin:.7mm 0 .4mm;color:#42151f;font-size:9pt;line-height:1}.price-loyalty p{margin:0;color:#626a72;font-size:5.2pt;line-height:1.2}.price-loyalty ol{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1mm;margin:0;padding:0;list-style:none}.price-loyalty li{padding:1.2mm;border-radius:1.2mm;background:#fff}.price-loyalty li b,.price-loyalty li span{display:block}.price-loyalty li b{color:#42151f;font-size:5.4pt}.price-loyalty li span{margin-top:.4mm;color:#bd1238;font-size:5.4pt;font-weight:900}
 @media(max-width:600px){.family-price-list{grid-template-columns:1fr}}

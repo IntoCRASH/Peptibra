@@ -6,6 +6,10 @@ import "../mobile-enhancements.css";
 export default function SettingsClient({ role }: { role: "admin" | "socio" | "vendedor" }) {
   const [retention, setRetention] = useState("20");
   const [partner, setPartner] = useState(false);
+  const [freeBacEnabled, setFreeBacEnabled] = useState(true);
+  const [freeBacThreshold, setFreeBacThreshold] = useState("200");
+  const [exchangeRate, setExchangeRate] = useState("60");
+  const [exchangeStatus, setExchangeStatus] = useState("Consultando tasa diaria…");
   const [status, setStatus] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   useEffect(() => {
@@ -13,10 +17,17 @@ export default function SettingsClient({ role }: { role: "admin" | "socio" | "ve
       const get = (key: string, fallback: string) => String((data.settings || []).find((item: { key: string }) => item.key === key)?.value ?? fallback);
       setRetention(get("retencion_utilidad", "20"));
       setPartner(get("ganancia_por_socio", "0") === "1");
+      setFreeBacEnabled(get("bac_free_enabled", "1") === "1");
+      setFreeBacThreshold(get("bac_free_threshold_usd", "200"));
+      setExchangeRate(get("dop_sell_rate", "60"));
     });
+    fetch("/api/exchange-rate").then((response) => response.json()).then((result) => {
+      if (result.rate) setExchangeRate(Number(result.rate).toFixed(2));
+      setExchangeStatus(result.stale ? "Última tasa válida guardada" : `Actualizada desde ${result.source || "InfoDólar"}`);
+    }).catch(() => setExchangeStatus("Última tasa válida guardada"));
   }, []);
   async function save() {
-    for (const [key, value] of [["retencion_utilidad", retention], ["ganancia_por_socio", partner ? "1" : "0"]]) {
+    for (const [key, value] of [["retencion_utilidad", retention], ["ganancia_por_socio", partner ? "1" : "0"], ["bac_free_enabled", freeBacEnabled ? "1" : "0"], ["bac_free_threshold_usd", String(Math.max(0, Number(freeBacThreshold) || 0))], ["dop_sell_rate", String(Math.max(0.01, Number(exchangeRate) || 60))]]) {
       await fetch("/api/mobile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "saveSetting", data: { key, value } }) });
     }
     setStatus("Configuración guardada");
@@ -46,8 +57,8 @@ export default function SettingsClient({ role }: { role: "admin" | "socio" | "ve
     setStatus(response.ok ? "Respaldo restaurado correctamente" : result.error || "No se pudo restaurar");
   }
   return <main className="settings-mobile-page">
-    <header><a href="/ptbr-mobile">← Volver</a><span>CONFIGURACIÓN</span><h1>Preferencias y respaldo</h1></header>
-    {role === "admin" && <section><label>Porcentaje que se guarda para el negocio<input type="number" min="0" max="100" step="0.1" value={retention} onChange={(event) => setRetention(event.target.value)} /></label><label className="settings-check"><input type="checkbox" checked={partner} onChange={(event) => setPartner(event.target.checked)} /> Separar ganancias e inventario por socio</label><button onClick={save}>Guardar preferencias</button></section>}
+    <header><a href="/office">← Volver</a><span>CONFIGURACIÓN</span><h1>Preferencias de la cuenta</h1></header>
+    {role === "admin" && <section><h2>Reglas comerciales</h2><label>Porcentaje recomendado para reponer inventario<input type="number" min="0" max="100" step="0.1" value={retention} onChange={(event) => setRetention(event.target.value)} /></label><p>Este porcentaje se presenta como sugerencia. No aparta ni descuenta dinero automáticamente.</p><label className="settings-check"><input type="checkbox" checked={partner} onChange={(event) => setPartner(event.target.checked)} /> Separar ganancias e inventario por socio</label><label className="settings-check"><input type="checkbox" checked={freeBacEnabled} onChange={(event) => setFreeBacEnabled(event.target.checked)} /> Incluir una unidad de Agua BAC sin costo cuando la venta supere el umbral</label><label>Umbral para Agua BAC gratuita (USD)<input type="number" min="0" step="0.01" value={freeBacThreshold} onChange={(event) => setFreeBacThreshold(event.target.value)} disabled={!freeBacEnabled} /></label><label>Tasa de venta DOP por USD<input type="number" min="1" step="0.01" value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} /></label><p>{exchangeStatus}. Puedes ajustar la tasa manualmente como respaldo.</p><button onClick={save}>Guardar preferencias</button></section>}
     <section><h2>Seguridad</h2><p>Cambia la contraseña utilizada para entrar a la oficina privada.</p><form className="settings-password" onSubmit={changePassword}><label>Contraseña actual<input name="current" type="password" autoComplete="current-password" required /></label><label>Nueva contraseña<input name="next" type="password" minLength={10} autoComplete="new-password" required /></label><label>Confirmar nueva contraseña<input name="confirm" type="password" minLength={10} autoComplete="new-password" required /></label><button disabled={passwordBusy}>{passwordBusy ? "Actualizando…" : "Cambiar contraseña"}</button></form></section>
     {role === "admin" && <section><h2>Respaldo de datos</h2><p>Incluye productos, inventario, clientes, facturas, pagos, caja, equipo, proveedores, protocolos y configuraciones.</p><a className="settings-action" href="/api/mobile/backup" download>Exportar respaldo completo</a><label className="settings-action file">Importar / restaurar respaldo<input type="file" accept="application/json,.json" onChange={(event) => event.target.files?.[0] && restore(event.target.files[0])} /></label></section>}
     {status && <p className="settings-status">{status}</p>}

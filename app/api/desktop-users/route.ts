@@ -3,6 +3,7 @@ import { cloudDb } from "@/lib/cloudflare/supabase-compat";
 import { hashPassword, userFromBearer } from "@/lib/cloudflare/auth";
 import { randomBytes } from "node:crypto";
 
+type Row=Record<string,unknown>;
 const service=()=>cloudDb;
 const escapeHtml=(value:unknown)=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]!));
 
@@ -11,7 +12,7 @@ async function sendAccessEmail(email:string,name:string,password:string){
   if(!apiKey)return {sent:false,error:"El servicio de correo no está configurado."};
   const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{authorization:`Bearer ${apiKey}`,"content-type":"application/json"},body:JSON.stringify({
     from:process.env.ACCESS_FROM_EMAIL||process.env.CONTACT_FROM_EMAIL||"Peptibra <onboarding@resend.dev>",to:[email],subject:"Tu acceso privado a Peptibra",
-    html:`<div style="font-family:Arial,sans-serif;max-width:580px;margin:auto;color:#20252b"><div style="border-top:6px solid #a70d2d;padding:28px"><h1 style="color:#a70d2d">Acceso a Peptibra</h1><p>Hola <strong>${escapeHtml(name)}</strong>,</p><p>Se creó o restableció tu acceso personal a la oficina de Peptibra.</p><p><strong>Usuario:</strong> ${escapeHtml(email)}<br/><strong>Contraseña temporal:</strong> ${escapeHtml(password)}</p><p><a href="https://peptibra.com/login?next=%2Fptbr-mobile" style="display:inline-block;background:#a70d2d;color:white;text-decoration:none;padding:12px 18px;border-radius:7px">Entrar a la oficina</a></p><p style="font-size:12px;color:#68717b">Al entrar por primera vez deberás cambiar la contraseña temporal.</p></div></div>`
+    html:`<div style="font-family:Arial,sans-serif;max-width:580px;margin:auto;color:#20252b"><div style="border-top:6px solid #ef003f;padding:28px"><img src="https://peptibra.com/brand/peptibra-logo-dark-1400.png" width="210" alt="Peptibra" style="display:block;height:auto;margin:0 0 24px"><h1 style="color:#ef003f">Acceso a Peptibra</h1><p>Hola <strong>${escapeHtml(name)}</strong>,</p><p>Se creó o restableció tu acceso personal a la oficina de Peptibra.</p><p><strong>Usuario:</strong> ${escapeHtml(email)}<br/><strong>Contraseña temporal:</strong> ${escapeHtml(password)}</p><p><a href="https://peptibra.com/login?next=%2Fptbr-mobile" style="display:inline-block;background:#ef003f;color:white;text-decoration:none;padding:12px 18px;border-radius:7px">Entrar a la oficina</a></p><p style="font-size:12px;color:#68717b">Al entrar por primera vez deberás cambiar la contraseña temporal.</p></div></div>`
   })});
   if(response.ok)return {sent:true,error:""};
   const detail=await response.json().catch(()=>({})) as {message?:string;error?:{message?:string}};
@@ -53,6 +54,9 @@ export async function POST(request:Request){
     if(profileError)throw profileError;
     const temporary=`Ptbr-${randomBytes(8).toString("base64url")}!`,passwordHash=await hashPassword(temporary);
     const {error:accountError}=await db.from("auth_users").upsert({id:email,email,password_hash:passwordHash,role,team_id:teamId,active:1,must_change_password:1,created_at:now,updated_at:now},{onConflict:"email"});if(accountError)throw accountError;
+    // Cada acceso recibe el catálogo común, pero comienza con un inventario
+    // propio explícitamente inicializado en cero.
+    const location=`VENDEDOR:${teamId}`,[{data:products,error:productsError},{data:balances,error:balancesError}]=await Promise.all([db.from("products").select("id").eq("status","active"),db.from("inventory_balances").select("product_id").eq("location",location)]);if(productsError)throw productsError;if(balancesError)throw balancesError;const existing=new Set((balances||[]).map((row:Row)=>Number(row.product_id))),missing=(products||[]).filter((product:Row)=>!existing.has(Number(product.id))).map((product:Row)=>({product_id:Number(product.id),location,quantity:0,updated_at:now}));if(missing.length){const {error:inventoryError}=await db.from("inventory_balances").upsert(missing,{onConflict:"product_id,location"});if(inventoryError)throw inventoryError}
     const delivery=await sendAccessEmail(email,String(member.name||"Integrante"),temporary);
     return Response.json({ok:true,emailSent:delivery.sent,temporaryPassword:temporary,
       message:delivery.sent?`Acceso de ${member.name} creado y enviado a ${email}.`:`Acceso de ${member.name} creado, pero el correo no pudo enviarse. ${delivery.error}`});

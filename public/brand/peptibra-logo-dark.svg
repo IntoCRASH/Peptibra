@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 270" role="img" aria-label="Peptibra">
+  <defs><linearGradient id="r" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#e90039"/><stop offset="1" stop-color="#ff164f"/></linearGradient></defs>
+  <g transform="translate(15 12) scale(.48)"><path fill="url(#r)" d="M105 35H397c68 0 108 43 108 107 0 71-45 116-111 134l-104 29 50-177L50 230z"/><path fill="url(#r)" d="M72 262l193-68-47 236L12 492z"/></g>
+  <text x="275" y="184" fill="#17191c" font-family="Arial Black,Arial,sans-serif" font-size="133" font-weight="900" letter-spacing="-8">Peptibra</text>
+</svg>

@@ -1,0 +1,44 @@
+/* Variable content must wrap without colliding with adjacent printable regions. */
+.canonical-sheet .invoice-party-card {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  height: auto;
+  min-height: 29.63mm;
+}
+.invoice-party-card > div,
+.invoice-bottom > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.invoice-party-card h2,
+.canonical-table td,
+.protocol-product,
+.protocol-metrics > div {
+  overflow-wrap: anywhere;
+}
+.invoice-bottom {
+  grid-template-columns: minmax(0, 1fr) 89.7mm;
+}
+.invoice-bottom aside {
+  height: auto;
+  min-height: 45.7mm;
+}
+.invoice-bottom aside p { gap: 3mm; }
+.invoice-bottom aside b { white-space: nowrap; }
+.protocol-steps { grid-auto-rows: minmax(33.9mm, auto); }
+.protocol-steps > div {
+  height: auto;
+  min-height: 33.9mm;
+  overflow-wrap: anywhere;
+}
+.protocol-steps p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pdf-capture-mode .invoice-party-card,
+.pdf-capture-mode .invoice-bottom {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+}
+.pdf-capture-mode .protocol-steps > div {
+  height: auto !important;
+  min-height: 33.9mm !important;
+}

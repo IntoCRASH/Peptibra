@@ -61,13 +61,14 @@ export function LanguageProvider({children}:{children:React.ReactNode}){
   const setLocale=(v:Locale)=>{setState(v);localStorage.setItem("peptibra_language",v)};
   useEffect(()=>{
     const saved=localStorage.getItem("peptibra_language");
-    if(saved==="es")setState("es");
+    const timer=saved==="es"?window.setTimeout(()=>setState("es"),0):undefined;
+    return()=>{if(timer!==undefined)window.clearTimeout(timer)};
   },[]);
   useEffect(()=>{
     const path=window.location.pathname;
     // La oficina siempre opera en español y su acceso siempre se presenta en inglés,
     // independientemente del idioma elegido para el sitio público.
-    if(path.startsWith("/ptbr-mobile")){document.documentElement.lang="es";return}
+    if(path.startsWith("/ptbr-mobile")||path.startsWith("/office")){document.documentElement.lang="es";return}
     if(path==="/login"){document.documentElement.lang="en";return}
     translate(locale);const o=new MutationObserver(()=>translate(locale));o.observe(document.body,{childList:true,subtree:true,characterData:true});return()=>o.disconnect()
   },[locale]);
