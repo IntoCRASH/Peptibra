@@ -923,7 +923,73 @@ export default function MobileOffice({
     </form>
   }
   function Cash() {
-    const matchesRange=(row:Row)=>cashRange==="all"||rowMonth(row).startsWith(cashRange==="year"?cashYear:reportMonth),periodInvoices=invoices.filter(matchesRange),periodInvoiceIds=new Set(periodInvoices.map(invoice=>Number(invoice.id))),periodCash=cash.filter(matchesRange),periodSales=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.total||0),0),periodCollected=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.paid||0),0),periodPending=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.balance||0),0),periodUnits=invoiceItems.filter(item=>periodInvoiceIds.has(Number(item.invoice_id))).reduce((sum,item)=>sum+Number(item.quantity||0),0),periodCashNet=periodCash.reduce((sum,movement)=>sum+(String(movement.type)==="Ingreso"?Number(movement.amount||0):String(movement.type)==="Egreso"?-Number(movement.amount||0):0),0),availableYears=[...new Set([...invoices,...cash].map(row=>rowMonth(row).slice(0,4)).filter(year=>/^\d{4}$/.test(year)))].sort((a,b)=>b.localeCompare(a)),rangeLabel=cashRange==="all"?"Todo el historial":cashRange==="year"?cashYear:new Intl.DateTimeFormat("es-DO",{month:"long",year:"numeric"}).format(new Date(`${reportMonth}-01T12:00:00`));
+    const matchesRange = (row: Row) =>
+      cashRange==="all" || rowMonth(row).startsWith(cashRange==="year" ? cashYear : reportMonth);
+    const periodInvoices = invoices.filter(matchesRange);
+    const invoicesById = new Map(invoices.map(invoice => [Number(invoice.id), invoice]));
+    const periodInvoiceIds = new Set(periodInvoices.map(invoice => Number(invoice.id)));
+    const periodCash = cash.filter(matchesRange);
+    const periodSales = periodInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const periodCollected = periodInvoices.reduce((sum, invoice) => sum + Number(invoice.paid || 0), 0);
+    const periodPending = periodInvoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0);
+    const periodUnits = invoiceItems.filter(item => periodInvoiceIds.has(Number(item.invoice_id)))
+      .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const periodCashNet = periodCash.reduce((sum, movement) =>
+      sum + (movement.type === "Ingreso" ? Number(movement.amount || 0) : movement.type === "Egreso" ? -Number(movement.amount || 0) : 0), 0);
+    const availableYears = [...new Set([...invoices, ...cash].map(row => rowMonth(row).slice(0, 4))
+      .filter(year => /^\d{4}$/.test(year)))].sort((a, b) => b.localeCompare(a));
+    const rangeLabel = cashRange==="all" ? "Todo el historial" : cashRange==="year" ? cashYear
+      : new Intl.DateTimeFormat("es-DO", { month: "long", year: "numeric" }).format(new Date(`${reportMonth}-01T12:00:00`));
+    const enteredCash = periodCash.filter(movement => movement.type === "Ingreso" &&
+      movement.category === "Cobro factura");
+    const currentInvoiceReceipts = enteredCash.filter(movement => periodInvoiceIds.has(Number(movement.invoice_id)));
+    const otherInvoiceReceipts = enteredCash.filter(movement => {
+      const invoice = invoicesById.get(Number(movement.invoice_id));
+      return invoice && rowMonth(invoice) && !matchesRange(invoice);
+    });
+    const unassignedReceipts = enteredCash.filter(movement => !currentInvoiceReceipts.includes(movement) &&
+      !otherInvoiceReceipts.includes(movement));
+    const receiptTotal = (rows: Row[]) => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const paymentsByInvoice = new Map<number, Row[]>();
+    for (const payment of payments) {
+      const invoiceId = Number(payment.invoice_id);
+      const history = paymentsByInvoice.get(invoiceId) ?? [];
+      history.push(payment);
+      paymentsByInvoice.set(invoiceId, history);
+    }
+    const reportDate = (row?: Row) => String(row?.created_at || row?.updated_at || "").slice(0, 10) || "—";
+    const invoiceDetails = (label: string, value: number, field: "total" | "paid" | "balance") => {
+      const rows = periodInvoices.filter(invoice => field === "total" || Number(invoice[field]) > 0);
+      return (
+        <details className="metric cash-detail">
+          <summary><span>{label}</span><b>{money(value)}</b></summary>
+          {rows.length ? <ul>{rows.map(invoice => (
+            <li key={String(invoice.id)}>
+              <strong>{String(invoice.number || "Factura")}</strong>
+              <span>Venta {reportDate(invoice)} · {money(invoice[field])}</span>
+              {paymentsByInvoice.get(Number(invoice.id))?.map(payment => (
+                <small key={String(payment.id)}>Cobro {reportDate(payment)} · {money(payment.applied_usd)}</small>
+              ))}
+            </li>
+          ))}</ul> : <small>Sin facturas para este total.</small>}
+        </details>
+      );
+    };
+    const receiptDetails = (label: string, rows: Row[]) => (
+      <details className="metric cash-detail">
+        <summary><span>{label}</span><b>{money(receiptTotal(rows))}</b></summary>
+        {rows.length ? <ul>{rows.map(movement => {
+          const invoice = invoicesById.get(Number(movement.invoice_id));
+          return (
+            <li key={String(movement.id)}>
+              <strong>{String(invoice?.number || movement.category)}</strong>
+              <span>Venta {reportDate(invoice)} · Entrada a Caja {reportDate(movement)}</span>
+              <small>{money(movement.amount)}</small>
+            </li>
+          );
+        })}</ul> : <small>Sin cobros para este total.</small>}
+      </details>
+    );
     const canDeleteCash = (movement: Row) => isAdmin && !movement.invoice_id && !movement.withdrawal_id && !movement.purchase_id && !["Pago a Peptibra pendiente", "Pago de vendedor a Peptibra"].includes(String(movement.category));
     const deletableCashIds = periodCash.filter(canDeleteCash).map((movement) => Number(movement.id));
     const [selectedCashIds, setSelectedCashIds] = useState<number[]>([]);
@@ -956,11 +1022,20 @@ export default function MobileOffice({
           </button>
         </div>
         <div className="mobile-metrics cash-period-metrics">
-          <Card label="Cobrado de esas ventas" value={money(periodCollected)} tone="green" />
-          <Card label="Pendiente de cobro" value={money(periodPending)} tone="amber" />
+          {invoiceDetails("Detalle de ventas", periodSales, "total")}
+          {invoiceDetails("Cobrado de esas ventas", periodCollected, "paid")}
+          {invoiceDetails("Pendiente de esas ventas", periodPending, "balance")}
           <Card label="Unidades vendidas" value={String(periodUnits)} tone="blue" />
           <Card label="Flujo neto de movimientos" value={money(periodCashNet)} />
         </div>
+        <ListTitle title={`Cobros de facturas ingresados a Caja · ${rangeLabel}`} />
+        <div className="mobile-metrics cash-period-metrics">
+          {receiptDetails("Total ingresado por cobros", enteredCash)}
+          {receiptDetails("De facturas del período", currentInvoiceReceipts)}
+          {receiptDetails("De facturas de otros períodos", otherInvoiceReceipts)}
+          {unassignedReceipts.length > 0 && receiptDetails("Sin factura o período identificado", unassignedReceipts)}
+        </div>
+        <p className="cash-explanation">Las entregas de vendedores y los demás movimientos se consultan en el flujo neto de movimientos.</p>
         <ListTitle title="Indicadores financieros generales" />
         <div className="mobile-metrics cash-metrics">
           <Card

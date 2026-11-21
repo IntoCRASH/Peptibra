@@ -11,7 +11,7 @@ class Query implements PromiseLike<Result> {
   private operation: "select" | "insert" | "update" | "delete" | "upsert" = "select";
   private columns = "*";
   private values: Row | Row[] | null = null;
-  private filters: { field: string; op: "=" | "!=" | "in"; value: unknown }[] = [];
+  private filters: { field: string; op: "=" | "!=" | "in" | "LIKE"; value: unknown }[] = [];
   private ordering: { field: string; ascending: boolean } | null = null;
   private maxRows: number | null = null;
   private singleMode: "single" | "maybe" | null = null;
@@ -27,6 +27,11 @@ class Query implements PromiseLike<Result> {
   upsert(values: Row | Row[], options?: { onConflict?: string }) { this.operation = "upsert"; this.values = values; this.conflict = options?.onConflict || "id"; return this; }
   eq(field: string, value: unknown) { ident(field); this.filters.push({ field, op: "=", value }); return this; }
   neq(field: string, value: unknown) { ident(field); this.filters.push({ field, op: "!=", value }); return this; }
+  like(field: string, pattern: string) {
+    ident(field);
+    this.filters.push({ field, op: "LIKE", value: pattern });
+    return this;
+  }
   in(field: string, value: unknown[]) { ident(field); this.filters.push({ field, op: "in", value }); return this; }
   order(field: string, options?: { ascending?: boolean }) { ident(field); this.ordering = { field, ascending: options?.ascending !== false }; return this; }
   limit(value: number) { this.maxRows = Math.max(0, Math.trunc(value)); return this; }
