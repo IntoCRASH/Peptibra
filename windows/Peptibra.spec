@@ -2,8 +2,8 @@
 from PyInstaller.utils.hooks import collect_all
 
 datas = [
-    ("public/brand/peptibra-logo-light-1400.png", "."),
-    ("public/brand/monthyva-wordmark.png", "."),
+    ("../public/brand/peptibra-logo-light-1400.png", "."),
+    ("../public/brand/monthyva-wordmark.png", "."),
 ]
 binaries = []
 hiddenimports = ["webview.platforms.edgechromium"]
@@ -14,7 +14,7 @@ for package in ("webview", "clr_loader", "pythonnet"):
     hiddenimports += package_data[2]
 
 a = Analysis(
-    ["windows/launcher.py"],
+    ["launcher.py"],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -29,5 +29,5 @@ exe = EXE(
     [],
     name="Peptibra",
     console=False,
-    icon="public/favicon-isotipo.png",
+    icon="../public/favicon-isotipo.png",
 )
