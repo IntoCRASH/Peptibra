@@ -556,12 +556,18 @@ export default function MobileOffice({
         </div>
         {isSeller && (
           <div className="cash-hero">
-            <span>Comisiones acumuladas</span>
-            <b>{money(access.commissionTotal)}</b>
+            <span>Mis ventas y comisiones</span>
+            <b>{money(access.commissionEarned)}</b>
             <small>
-              Calculadas al {Number(access.commissionRate || 0).toFixed(2)}%
-              sobre tus ventas registradas
+              Comisión generada al {Number(access.commissionRate || 0).toFixed(2)}% sobre ventas ya cobradas
             </small>
+            <div className="commission-breakdown">
+              <span><small>Ventas cobradas</small><strong>{money(access.salesCollected)}</strong></span>
+              <span><small>Ventas por cobrar</small><strong>{money(access.salesPending)}</strong></span>
+              <span><small>Comisión pendiente del cliente</small><strong>{money(access.commissionPendingCollection)}</strong></span>
+              <span><small>Comisión ya pagada</small><strong>{money(access.commissionPaid)}</strong></span>
+              <span><small>Comisión disponible por pagar</small><strong>{money(access.commissionDue)}</strong></span>
+            </div>
           </div>
         )}
         <div className="mobile-list roomy">
@@ -579,6 +585,7 @@ export default function MobileOffice({
                   {String(i.client_name)} · {String(i.seller_name)}
                 </span>
                 <small>{String(i.created_at).slice(0, 10)}</small>
+                <small className={`delivery-badge ${String(i.delivery_status)==="Entregada"?"delivered":"pending"}`}>{String(i.delivery_status||"Pendiente de entrega")}</small>
               </div>
               <div className="right">
                 <b>{money(i.total)}</b>
@@ -1237,10 +1244,11 @@ export default function MobileOffice({
                   {String(t.role)}
                   {t.partner_name ? ` · ${String(t.partner_name)}` : ""}
                 </span>
+                {String(t.role)==="Vendedor"&&<small>Ventas {money(t.sales_total)} · Cobradas {money(t.sales_collected)} · Por cobrar {money(t.sales_pending)}</small>}
               </div>
               <div className="right">
                 <b>{Number(t.commission).toFixed(1)}%</b>
-                <small>comisión</small>
+                <small>{String(t.role)==="Vendedor"?`${money(t.commission_due)} por pagar · ${money(t.commission_pending_collection)} pendiente del cliente`:"comisión"}</small>
               </div>
             </article>
           ))}
@@ -1858,6 +1866,20 @@ export default function MobileOffice({
           <br />
           Pagado {money(invoice.paid)} · Pendiente {money(invoice.balance)}
         </p>
+        <div className="delivery-status-card">
+          <div>
+            <small>ESTADO DE ENTREGA</small>
+            <b>{String(invoice.delivery_status || "Pendiente de entrega")}</b>
+            {Boolean(invoice.delivered_at) && <span>Entregada el {String(invoice.delivered_at).slice(0, 10)}</span>}
+            {Boolean(invoice.delivery_notes) && <span>{String(invoice.delivery_notes)}</span>}
+          </div>
+          {String(invoice.delivery_status) === "Entregada" ? (
+            <button type="button" className="secondary" onClick={() => post("updateDeliveryStatus", { invoiceId: invoice.id, status: "Pendiente de entrega", previousStatus: invoice.delivery_status, previousDeliveredAt: invoice.delivered_at, previousNotes: invoice.delivery_notes })}>Marcar pendiente</button>
+          ) : (
+            <button type="button" onClick={() => post("updateDeliveryStatus", { invoiceId: invoice.id, status: "Entregada", deliveredAt: new Date().toISOString(), previousStatus: invoice.delivery_status, previousDeliveredAt: invoice.delivered_at, previousNotes: invoice.delivery_notes })}>Marcar entregada</button>
+          )}
+        </div>
+        {Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)>0&&<div className="invoice-commission-note"><span>Comisión de esta factura</span><b>{money(Number(invoice.total||0)*Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)/100)}</b><small>{money(Number(invoice.paid||0)*Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)/100)} generada · {money(Number(invoice.balance||0)*Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)/100)} pendiente de cobro</small></div>}
         {history.length > 0 && (
           <div className="payment-history">
             <b>Historial de pagos</b>
@@ -2206,6 +2228,7 @@ export default function MobileOffice({
             <option>Socio</option>
           </select>
         </label>
+        <small><b>Vendedor:</b> maneja sus ventas, inventario y comisión personal. <b>Socio:</b> maneja su operación e inventario privado. La administración conserva la vista global y es la única que crea accesos.</small>
         <Select
           name="partnerId"
           label="Socio responsable"

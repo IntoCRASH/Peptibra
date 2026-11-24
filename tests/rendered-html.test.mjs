@@ -383,6 +383,38 @@ test("cada producto puede exigir complementos por unidad y una factura nueva abr
   assert.match(api, /item\.quantity\)\*Math\.max\(1,num\(item\.complementQuantity,1\)\)/);
 });
 
+test("equipo separa comisiones cobradas y pendientes y las facturas controlan entrega", async () => {
+  const [office, api, css] = await Promise.all([
+    read("app/ptbr-mobile/MobileOffice.tsx"),
+    read("app/api/mobile/route.ts"),
+    read("app/ptbr-mobile/mobile-enhancements.css"),
+  ]);
+  assert.match(api, /commission_pending_collection/);
+  assert.match(api, /commission_paid/);
+  assert.match(api, /commission_due/);
+  assert.match(api, /action==="updateDeliveryStatus"/);
+  assert.match(api, /invoice_delivery:/);
+  assert.match(office, /Comisión pendiente del cliente/);
+  assert.match(office, /Comisión disponible por pagar/);
+  assert.match(office, /Marcar entregada/);
+  assert.match(office, /Marcar pendiente/);
+  assert.match(css, /\.delivery-status-card/);
+  assert.match(css, /\.commission-breakdown/);
+});
+
+test("el repositorio conserva los fuentes para compilar Windows sin la PC original", async () => {
+  const [launcher, installer, workflow] = await Promise.all([
+    read("windows/launcher.py"),
+    read("windows/Peptibra.iss"),
+    read(".github/workflows/windows-installer.yml"),
+  ]);
+  assert.match(launcher, /OFFICE_URL = "https:\/\/www\.peptibra\.com\/office"/);
+  assert.match(launcher, /maximized=True/);
+  assert.match(installer, /Peptibra-Setup-/);
+  assert.match(workflow, /workflow_dispatch/);
+  assert.match(workflow, /upload-artifact@v4/);
+});
+
 test("los imprimibles envuelven textos variables y limitan filas de factura", async () => {
   const [invoice, protocol, resilience] = await Promise.all([
     read("app/ptbr-mobile/invoices/[id]/InvoicePrint.tsx"),

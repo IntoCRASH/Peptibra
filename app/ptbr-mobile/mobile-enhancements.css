@@ -102,6 +102,19 @@
 .product-complement-rule { display: grid; gap: 12px; padding: 16px; border: 1px solid #ead9de; border-radius: 16px; background: #fffafb; }
 .product-complement-rule .checkline { display: flex; align-items: center; gap: 10px; font-weight: 800; }
 .product-complement-rule .checkline input { width: 20px; height: 20px; margin: 0; accent-color: #c90d3f; }
+.commission-breakdown { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 16px; }
+.commission-breakdown span { display: grid; gap: 3px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,.13); }
+.commission-breakdown strong { font-size: 1rem; }
+.delivery-badge { display: inline-flex; width: fit-content; margin-top: 5px; padding: 4px 8px; border-radius: 999px; font-weight: 800; }
+.delivery-badge.pending { color: #9b6200; background: #fff3d8; }
+.delivery-badge.delivered { color: #087653; background: #def7ec; }
+.delivery-status-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; margin: 14px 0; border: 1px solid #e4e8ec; border-radius: 16px; background: #f8fafb; }
+.delivery-status-card > div { display: grid; gap: 4px; }
+.delivery-status-card small { color: #8c2944; font-weight: 900; letter-spacing: .08em; }
+.delivery-status-card span { color: #66717d; font-size: .84rem; }
+.invoice-commission-note { display: grid; grid-template-columns: 1fr auto; gap: 3px 16px; padding: 13px 16px; border-radius: 14px; background: #f5eef1; }
+.invoice-commission-note small { grid-column: 1 / -1; color: #6d6870; }
+@media (max-width:640px){.commission-breakdown{grid-template-columns:1fr}.delivery-status-card{align-items:stretch;flex-direction:column}.delivery-status-card button{width:100%}}
 .inventory-total-card{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:0 0 14px;overflow:hidden;border:1px solid #e1e5e9;border-radius:14px;background:#e1e5e9}.inventory-total-card span{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:#fff}.inventory-total-card small,.inventory-total-card b{display:block}.inventory-total-card small{color:#727c86;font-size:9px;font-weight:700}.inventory-total-card b{color:#9d1230;font-size:15px}.pen-order-prompt{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:#1b1015a8}.pen-order-prompt>div{width:min(440px,100%);max-height:80vh;overflow:auto;border-radius:18px;background:#fff;padding:24px;box-shadow:0 28px 80px #0005}.pen-order-prompt small{color:#bd1238;font-size:8px;font-weight:900;letter-spacing:.14em}.pen-order-prompt h3{margin:7px 0;font-size:22px}.pen-order-prompt p{margin:0 0 16px;color:#68727c;font-size:11px;line-height:1.5}.pen-order-prompt button{display:flex;align-items:center;justify-content:space-between;width:100%;height:auto;min-height:46px;margin-top:8px;padding:11px 13px;text-align:left}.pen-order-prompt button b{color:inherit}.pen-order-prompt button.secondary{justify-content:center;background:#fff;color:#9d1230;border:1px solid #dba7b3}
 @media(max-width:620px){.cart-add{grid-template-columns:minmax(0,1fr) 92px}.cart-add>button{grid-column:1/-1}}
 
