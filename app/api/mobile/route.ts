@@ -274,6 +274,19 @@ export async function POST(request: Request) {
     if(action==="updateDeliveryStatus"){
       const id=num(d.invoiceId);if(!await canUseInvoice(id))return json({error:"No puedes modificar la entrega de esta factura."},403);const invoice=await one("invoices",id);if(!invoice)return json({error:"Factura no encontrada"},404);const status=str(d.status)==="Entregada"?"Entregada":"Pendiente de entrega",deliveredAt=status==="Entregada"?(str(d.deliveredAt)||now):"",notes=str(d.notes),key=`invoice_delivery:${id}`;const before={status:str(d.previousStatus)||"Pendiente de entrega",deliveredAt:str(d.previousDeliveredAt),notes:str(d.previousNotes)};const after={status,deliveredAt,notes};const {error}=await cloud.from("app_settings").upsert({key,value:JSON.stringify(after),updated_at:now},{onConflict:"key"});if(error)throw error;await audit("delivery","invoice",id,before,after);return json({ok:true,...after});
     }
+    if(action==="updateDeliveryStatusBulk"){
+      const ids=[...new Set((Array.isArray(d.invoiceIds)?d.invoiceIds:[]).map(num).filter(id=>id>0))];
+      if(!ids.length)return json({error:"Selecciona al menos una factura."},400);
+      if(ids.length>500)return json({error:"Solo se pueden actualizar 500 facturas a la vez."},400);
+      for(const id of ids)if(!await canUseInvoice(id))return json({error:"No puedes modificar una o más de las facturas seleccionadas."},403);
+      const status=str(d.status)==="Entregada"?"Entregada":"Pendiente de entrega",deliveredAt=status==="Entregada"?now:"";
+      const {data:previousRows,error:previousError}=await cloud.from("app_settings").select("key,value").in("key",ids.map(id=>`invoice_delivery:${id}`));if(previousError)throw previousError;
+      const previous=new Map((previousRows||[]).map(row=>[num(str(row.key).split(":").pop()),row.value]));
+      const rows=ids.map(id=>({key:`invoice_delivery:${id}`,value:JSON.stringify({status,deliveredAt,notes:""}),updated_at:now}));
+      const {error}=await cloud.from("app_settings").upsert(rows,{onConflict:"key"});if(error)throw error;
+      for(const id of ids){let before={status:"Pendiente de entrega",deliveredAt:"",notes:""};try{before={...before,...JSON.parse(str(previous.get(id)))} }catch{}await audit("delivery_bulk","invoice",id,before,{status,deliveredAt,notes:""},{batchSize:ids.length})}
+      return json({ok:true,updated:ids.length,status});
+    }
     if(action==="reversePayments"){
       const id=num(d.invoiceId),inv=await one("invoices",id);if(!inv)return json({error:"Factura no encontrada"},404);await cloud.from("cash_movements").delete().eq("invoice_id",id);await cloud.from("payments").delete().eq("invoice_id",id);const {error}=await cloud.from("invoices").update({paid:0,balance:num(inv.total),status:"Pendiente",updated_at:now}).eq("id",id);if(error)throw error;return json({ok:true});
     }

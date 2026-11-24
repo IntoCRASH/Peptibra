@@ -41,7 +41,8 @@ export default function MobileOffice({
     [reportMonth, setReportMonth] = useState(currentMonthValue),
     [cashRange, setCashRange] = useState<"month" | "year" | "all">("month"),
     [cashYear, setCashYear] = useState(() => currentMonthValue().slice(0, 4)),
-    [inventoryDrafts, setInventoryDrafts] = useState<Record<number, string>>({});
+    [inventoryDrafts, setInventoryDrafts] = useState<Record<number, string>>({}),
+    [selectedDeliveryInvoices, setSelectedDeliveryInvoices] = useState<number[]>([]);
   const inventoryPending = useRef(new Map<number, number>()),
     inventoryTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>()),
     inventorySaving = useRef(new Map<number, Promise<void>>());
@@ -533,6 +534,10 @@ export default function MobileOffice({
   }
   function Sales() {
     const currentMonth=currentMonthValue(),periodInvoices=invoices.filter(invoice=>rowMonth(invoice)===reportMonth),visibleInvoices=(salesFilter === "pending" ? periodInvoices.filter(isInvoicePending) : periodInvoices),periodLabel=new Intl.DateTimeFormat("es-DO",{month:"long",year:"numeric"}).format(new Date(`${reportMonth}-01T12:00:00`)),periodTotal=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.total||0),0),periodPaid=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.paid||0),0),periodPending=periodInvoices.reduce((sum,invoice)=>sum+Number(invoice.balance||0),0);
+    const visibleIds=visibleInvoices.map(invoice=>Number(invoice.id)),allVisibleSelected=visibleIds.length>0&&visibleIds.every(id=>selectedDeliveryInvoices.includes(id));
+    const toggleInvoice=(id:number)=>setSelectedDeliveryInvoices(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
+    const toggleAll=()=>setSelectedDeliveryInvoices(current=>allVisibleSelected?current.filter(id=>!visibleIds.includes(id)):[...new Set([...current,...visibleIds])]);
+    const updateSelected=async(status:"Entregada"|"Pendiente de entrega")=>{const ids=selectedDeliveryInvoices.filter(id=>visibleIds.includes(id));if(!ids.length)return;await post("updateDeliveryStatusBulk",{invoiceIds:ids,status});setSelectedDeliveryInvoices([])};
     return (
       <>
         <PageHead
@@ -554,6 +559,11 @@ export default function MobileOffice({
           <button type="button" className={salesFilter === "pending" ? "active" : ""} onClick={() => setSalesFilter("pending")}>Pendientes ({periodInvoices.filter(isInvoicePending).length})</button>
           <button type="button" className={salesFilter === "all" ? "active" : ""} onClick={() => setSalesFilter("all")}>Todas</button>
         </div>
+        {visibleInvoices.length>0&&<div className="delivery-bulk-toolbar">
+          <label><input type="checkbox" checked={allVisibleSelected} onChange={toggleAll}/> Seleccionar todas las visibles</label>
+          <span>{selectedDeliveryInvoices.filter(id=>visibleIds.includes(id)).length} seleccionada(s)</span>
+          <div><button type="button" disabled={!selectedDeliveryInvoices.some(id=>visibleIds.includes(id))} onClick={()=>updateSelected("Entregada")}>Marcar entregadas</button><button type="button" className="secondary" disabled={!selectedDeliveryInvoices.some(id=>visibleIds.includes(id))} onClick={()=>updateSelected("Pendiente de entrega")}>Marcar pendientes</button></div>
+        </div>}
         {isSeller && (
           <div className="cash-hero">
             <span>Mis ventas y comisiones</span>
@@ -574,11 +584,13 @@ export default function MobileOffice({
           {visibleInvoices.map((i) => (
             <article
               key={String(i.id)}
+              className={selectedDeliveryInvoices.includes(Number(i.id))?"delivery-selected":""}
               onClick={() => {
                 setSelected(i);
                 setModal("Detalle de factura");
               }}
             >
+              <label className="delivery-select" onClick={event=>event.stopPropagation()}><input type="checkbox" aria-label={`Seleccionar factura ${String(i.number)}`} checked={selectedDeliveryInvoices.includes(Number(i.id))} onChange={()=>toggleInvoice(Number(i.id))}/></label>
               <div>
                 <b>{String(i.number)} {isInvoiceOverdue(i) && <span className="overdue-bell" title="Factura pendiente con más de 15 días" aria-label="Factura vencida">🔔</span>}</b>
                 <span>
