@@ -1864,6 +1864,17 @@ export default function MobileOffice({
   }
   function InvoiceDetail({ invoice }: { invoice: Row }) {
     const history = payments.filter((x) => x.invoice_id === invoice.id);
+    const payCommission=async()=>{
+      const due=Number(invoice.commission_due||0);if(due<=.005)return;
+      if(!confirm(`¿Registrar el pago de ${money(due)} de comisión a ${String(invoice.seller_name)}?`))return;
+      setError("");const response=await fetch("/api/mobile",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"payInvoiceCommission",data:{invoiceId:invoice.id}})}),result=await response.json();
+      if(!response.ok){setError(result.error||"No se pudo pagar la comisión");return}
+      await fetch("/api/mobile",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"touchRevision",data:{}})});
+      const digits=String(result.sellerPhone||"").replace(/\D/g,"").replace(/^00/,""),phone=digits.length===10?`1${digits}`:digits;
+      if(phone&&confirm(`Comisión registrada correctamente.\n\n¿Enviar el detalle por WhatsApp a ${String(result.sellerName)}?`))window.open(`https://wa.me/${phone}?text=${encodeURIComponent(String(result.message||""))}`,"_blank","noopener,noreferrer");
+      else if(!phone)alert("La comisión fue registrada, pero el vendedor no tiene un teléfono guardado para WhatsApp.");
+      setModal(null);setSelected(null);await load();
+    };
     return (
       <div className="invoice-mobile-detail">
         {isInvoiceOverdue(invoice) && (
@@ -1891,7 +1902,7 @@ export default function MobileOffice({
             <button type="button" onClick={() => post("updateDeliveryStatus", { invoiceId: invoice.id, status: "Entregada", deliveredAt: new Date().toISOString(), previousStatus: invoice.delivery_status, previousDeliveredAt: invoice.delivered_at, previousNotes: invoice.delivery_notes })}>Marcar entregada</button>
           )}
         </div>
-        {Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)>0&&<div className="invoice-commission-note"><span>Comisión de esta factura</span><b>{money(Number(invoice.total||0)*Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)/100)}</b><small>{money(Number(invoice.paid||0)*Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)/100)} generada · {money(Number(invoice.balance||0)*Number(team.find(member=>Number(member.id)===Number(invoice.seller_id))?.commission||0)/100)} pendiente de cobro</small></div>}
+        {Number(invoice.commission_rate||0)>0&&<div className="invoice-commission-note"><span>Comisión de esta factura</span><b>{money(Number(invoice.total||0)*Number(invoice.commission_rate||0)/100)}</b><small>{money(invoice.commission_earned)} generada · {money(invoice.commission_pending_collection)} pendiente de cobro · {money(invoice.commission_paid)} pagada</small>{isAdmin&&Number(invoice.commission_due||0)>.005&&<button type="button" onClick={payCommission}>Pagar comisión · {money(invoice.commission_due)}</button>}{isAdmin&&Number(invoice.commission_due||0)<=.005&&Number(invoice.commission_paid||0)>.005&&<em>Comisión pagada</em>}</div>}
         {history.length > 0 && (
           <div className="payment-history">
             <b>Historial de pagos</b>

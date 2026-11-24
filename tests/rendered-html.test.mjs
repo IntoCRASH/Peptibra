@@ -392,12 +392,16 @@ test("equipo separa comisiones cobradas y pendientes y las facturas controlan en
   assert.match(api, /commission_pending_collection/);
   assert.match(api, /commission_paid/);
   assert.match(api, /commission_due/);
+  assert.match(api, /action==="payInvoiceCommission"/);
+  assert.match(api, /commission_payment/);
   assert.match(api, /action==="updateDeliveryStatus"/);
   assert.match(api, /action==="updateDeliveryStatusBulk"/);
   assert.match(api, /invoice_delivery:/);
   assert.match(office, /Comisión pendiente del cliente/);
   assert.match(office, /Comisión disponible por pagar/);
   assert.match(office, /Marcar entregada/);
+  assert.match(office, /Pagar comisión/);
+  assert.match(office, /wa\.me/);
   assert.match(office, /Seleccionar todas las visibles/);
   assert.match(office, /Marcar entregadas/);
   assert.match(office, /Marcar pendiente/);
