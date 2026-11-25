@@ -322,6 +322,31 @@ export async function POST(request: Request) {
       }
       if(corrected>.005)await touchCloudRevision(now);return json({ok:true,corrected,removed,adjusted,affectedInvoices});
     }
+    if(action==="rollbackLastReconciliation"){
+      if(user.role!=="admin")return json({error:"Solo administración puede restaurar una conciliación."},403);
+      const preserveNumber=str(d.preserveInvoiceNumber);if(!preserveNumber)return json({error:"Indica la factura cuya corrección debe conservarse."},400);
+      const preserved=await pgDb.prepare("SELECT id,number FROM invoices WHERE number=?").bind(preserveNumber).first<{id:number;number:string}>();if(!preserved)return json({error:"No se encontró la factura que debe conservarse."},404);
+      const recent=(await pgDb.prepare("SELECT id,action,entity_type,entity_id,before_json,metadata_json,created_at FROM audit_log WHERE action LIKE 'reconcile_%' ORDER BY id DESC LIMIT 250").all<Data>()).results;
+      const batchAt=str(recent[0]?.created_at);if(!batchAt)return json({error:"No hay una conciliación reciente que restaurar."},404);
+      const batch=recent.filter(row=>str(row.created_at)===batchAt),restored:Data[]=[];
+      for(const entry of [...batch].reverse()){
+        let before:Data={},metadata:Data={};try{before=JSON.parse(str(entry.before_json)||"{}") as Data}catch{}try{metadata=JSON.parse(str(entry.metadata_json)||"{}") as Data}catch{}
+        const invoiceId=num(metadata.invoiceId);if(!invoiceId||invoiceId===num(preserved.id))continue;
+        const entityType=str(entry.entity_type),entityId=num(entry.entity_id);if(!entityId)continue;
+        if(str(entry.action)==="reconcile_delete"&&entityType==="payment"){
+          const {error}=await cloud.from("payments").upsert(before,{onConflict:"id"});if(error)throw error;
+        }else if(str(entry.action)==="reconcile_delete"&&entityType==="cash_movement"){
+          const invoice=await one("invoices",invoiceId),row={...before,type:"Ingreso",category:"Cobro factura",notes:str(invoice?.number)};const {error}=await cloud.from("cash_movements").upsert(row,{onConflict:"id"});if(error)throw error;
+        }else if(str(entry.action)==="reconcile_update"&&entityType==="payment"){
+          const {error}=await cloud.from("payments").update({applied_usd:num(before.applied_usd)}).eq("id",entityId);if(error)throw error;
+        }else if(str(entry.action)==="reconcile_update"&&entityType==="cash_movement"){
+          const {error}=await cloud.from("cash_movements").update({amount:num(before.amount)}).eq("id",entityId);if(error)throw error;
+        }else continue;
+        restored.push({invoiceId,entityType,entityId,amount:entityType==="payment"?num(before.applied_usd):num(before.amount)});
+        await audit("restore_reconciliation",entityType,entityId,null,before,{invoiceId,sourceAuditId:entry.id,preservedInvoiceId:preserved.id});
+      }
+      if(restored.length)await touchCloudRevision(now);return json({ok:true,preservedInvoiceNumber:preserveNumber,restored,restoredAmount:restored.filter(row=>str(row.entityType)==="payment").reduce((sum,row)=>sum+num(row.amount),0)});
+    }
     if(action==="deleteInvoice"){
       const id=num(d.invoiceId),inv=await one("invoices",id);if(!inv)return json({error:"Factura no encontrada"},404);const location=await invoiceInventoryLocation(id,num(inv.seller_id)),{data:items}=await cloud.from("invoice_items").select("*").eq("invoice_id",id);for(const item of items||[])await changeBalance(Number(item.product_id),location,Number(item.quantity));const loyalty=await loadLoyalty();await saveLoyaltyEvents(loyalty.events.filter(e=>e.key!==`purchase:${id}`&&e.key!==`redeem:${id}`));await cloud.from("cash_movements").delete().eq("invoice_id",id);await cloud.from("payments").delete().eq("invoice_id",id);await cloud.from("invoice_items").delete().eq("invoice_id",id);await cloud.from("app_settings").delete().in("key",[`invoice_fx:${id}`,`invoice_inventory_location:${id}`,`invoice_manual_discount:${id}`,`invoice_delivery:${id}`]);const {error}=await cloud.from("invoices").delete().eq("id",id);if(error)throw error;await audit("delete","invoice",id,{...inv,items},null,{location});return json({ok:true});
     }

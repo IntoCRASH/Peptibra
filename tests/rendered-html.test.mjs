@@ -491,8 +491,9 @@ test("Caja concilia excedentes contra pagos confirmados con auditoría", async (
     read("app/ptbr-mobile/MobileOffice.tsx"),
     read("app/api/mobile/route.ts"),
   ]);
-  assert.match(office, /post\("reconcileInvoiceCash",\{\}\)/);
+  assert.match(office, /post\("rollbackLastReconciliation",\{preserveInvoiceNumber:"PTBR-F202611-00046"\}\)/);
   assert.match(api, /action==="reconcileInvoiceCash"/);
+  assert.match(api, /action==="rollbackLastReconciliation"/);
   assert.match(api, /Cobro de Caja sin pago correspondiente/);
   assert.match(api, /Pago duplicado que excedía el total de la factura/);
   assert.match(api, /rows\.reduce\(\(sum,row\)=>sum\+num\(row\.applied_usd\),0\)-num\(invoice\.total\)/);
