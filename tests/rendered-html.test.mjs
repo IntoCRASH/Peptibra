@@ -485,3 +485,24 @@ test("los protocolos imprimibles cargan la fotografía del producto con fallback
   assert.match(protocol, /<ProductPhoto product=\{product\}/);
   assert.match(css, /\.protocol-product-image img/);
 });
+
+test("Caja concilia excedentes contra pagos confirmados con auditoría", async () => {
+  const [office, api] = await Promise.all([
+    read("app/ptbr-mobile/MobileOffice.tsx"),
+    read("app/api/mobile/route.ts"),
+  ]);
+  assert.match(office, /post\("reconcileInvoiceCash",\{\}\)/);
+  assert.match(api, /action==="reconcileInvoiceCash"/);
+  assert.match(api, /Cobro de Caja sin pago correspondiente/);
+  assert.match(api, /reconcile_delete/);
+  assert.match(api, /reconcile_update/);
+});
+
+test("Caja filtra y desglosa cobros por método de pago", async () => {
+  const office = await read("app/ptbr-mobile/MobileOffice.tsx");
+  assert.match(office, /cashPaymentMethod/);
+  assert.match(office, /Método de pago/);
+  assert.match(office, /paymentMethodTotals/);
+  assert.match(office, /Cobros confirmados por método/);
+  assert.match(office, /Detalle de todos los métodos/);
+});

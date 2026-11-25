@@ -41,6 +41,7 @@ export default function MobileOffice({
     [reportMonth, setReportMonth] = useState(currentMonthValue),
     [cashRange, setCashRange] = useState<"month" | "year" | "all">("month"),
     [cashYear, setCashYear] = useState(() => currentMonthValue().slice(0, 4)),
+    [cashPaymentMethod, setCashPaymentMethod] = useState("Todos"),
     [inventoryDrafts, setInventoryDrafts] = useState<Record<number, string>>({}),
     [selectedDeliveryInvoices, setSelectedDeliveryInvoices] = useState<number[]>([]);
   const inventoryPending = useRef(new Map<number, number>()),
@@ -948,6 +949,10 @@ export default function MobileOffice({
     const invoicesById = new Map(invoices.map(invoice => [Number(invoice.id), invoice]));
     const periodInvoiceIds = new Set(periodInvoices.map(invoice => Number(invoice.id)));
     const periodCash = cash.filter(matchesRange);
+    const periodPayments = payments.filter(matchesRange);
+    const paymentMethods = [...new Set(payments.map(payment=>String(payment.method||"Sin especificar")).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
+    const filteredPayments = cashPaymentMethod==="Todos" ? periodPayments : periodPayments.filter(payment=>String(payment.method||"Sin especificar")===cashPaymentMethod);
+    const paymentMethodTotals = periodPayments.reduce((totals,payment)=>{const method=String(payment.method||"Sin especificar");totals.set(method,(totals.get(method)||0)+Number(payment.applied_usd||0));return totals},new Map<string,number>());
     const periodSales = periodInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const periodCollected = periodInvoices.reduce((sum, invoice) => sum + Number(invoice.paid || 0), 0);
     const periodPending = periodInvoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0);
@@ -1009,6 +1014,12 @@ export default function MobileOffice({
         })}</ul> : <small>Sin cobros para este total.</small>}
       </details>
     );
+    const paymentDetails = (label:string, rows:Row[]) => (
+      <details className="metric cash-detail" open={cashPaymentMethod!=="Todos"}>
+        <summary><span>{label}</span><b>{money(rows.reduce((sum,row)=>sum+Number(row.applied_usd||0),0))}</b></summary>
+        {rows.length?<ul>{rows.map(payment=>{const invoice=invoicesById.get(Number(payment.invoice_id));return <li key={String(payment.id)}><strong>{String(invoice?.number||"Factura")}</strong><span>{String(payment.method||"Sin especificar")} · Cobro {reportDate(payment)}</span><small>{money(payment.applied_usd)}</small></li>})}</ul>:<small>Sin cobros con este método en el período.</small>}
+      </details>
+    );
     const canDeleteCash = (movement: Row) => isAdmin && !movement.invoice_id && !movement.withdrawal_id && !movement.purchase_id && !["Pago a Peptibra pendiente", "Pago de vendedor a Peptibra"].includes(String(movement.category));
     const deletableCashIds = periodCash.filter(canDeleteCash).map((movement) => Number(movement.id));
     const [selectedCashIds, setSelectedCashIds] = useState<number[]>([]);
@@ -1030,7 +1041,9 @@ export default function MobileOffice({
           </div>
           {cashRange==="month"&&<label>Mes y año<input type="month" value={reportMonth} max={currentMonthValue()} onChange={event=>setReportMonth(event.target.value||currentMonthValue())}/></label>}
           {cashRange==="year"&&<label>Año<select value={cashYear} onChange={event=>setCashYear(event.target.value)}>{availableYears.map(year=><option key={year}>{year}</option>)}</select></label>}
+          <label>Método de pago<select value={cashPaymentMethod} onChange={event=>setCashPaymentMethod(event.target.value)}><option>Todos</option>{paymentMethods.map(method=><option key={method}>{method}</option>)}</select></label>
           <strong>{rangeLabel}</strong>
+          {isAdmin&&<button type="button" className="secondary" onClick={async()=>{if(!window.confirm("Se compararán los cobros de Caja con los pagos confirmados y se corregirán únicamente los excedentes. ¿Continuar?"))return;const result=await post("reconcileInvoiceCash",{});if(result?.ok)window.alert(result.corrected>0?`Conciliación completada: ${money(result.corrected)} corregidos.`:"No se encontraron diferencias.")}}>Conciliar cobros</button>}
         </section>
         <div className="cash-hero">
           <span>Ventas totales · {rangeLabel}</span>
@@ -1047,6 +1060,11 @@ export default function MobileOffice({
           <Card label="Unidades vendidas" value={String(periodUnits)} tone="blue" />
           <Card label="Flujo neto de movimientos" value={money(periodCashNet)} />
         </div>
+        <ListTitle title={`Cobros confirmados por método · ${rangeLabel}`} />
+        <div className="mobile-metrics cash-period-metrics payment-method-summary">
+          {cashPaymentMethod==="Todos"?[...paymentMethodTotals.entries()].sort((a,b)=>b[1]-a[1]).map(([method,total])=><Card key={method} label={method} value={money(total)} tone="blue"/>):paymentDetails(cashPaymentMethod,filteredPayments)}
+        </div>
+        {cashPaymentMethod==="Todos"&&paymentDetails("Detalle de todos los métodos",filteredPayments)}
         <ListTitle title={`Cobros de facturas ingresados a Caja · ${rangeLabel}`} />
         <div className="mobile-metrics cash-period-metrics">
           {receiptDetails("Total ingresado por cobros", enteredCash)}
