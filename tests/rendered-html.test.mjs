@@ -514,3 +514,10 @@ test("Caja filtra y desglosa cobros por método de pago", async () => {
   assert.match(office, /Producto<select/);
   assert.match(office, /invoiceProducts/);
 });
+
+test("Productos muestra el valor potencial del inventario disponible", async () => {
+  const office = await read("app/ptbr-mobile/MobileOffice.tsx");
+  assert.match(office, /Pendiente por vender/);
+  assert.match(office, /Valor potencial al precio actual/);
+  assert.match(office, /Math\.max\(0,stock\(product\.id\)\)\*Math\.max\(0,Number\(product\.normal_price\|\|product\.price\|\|0\)\)/);
+});

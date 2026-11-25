@@ -620,6 +620,8 @@ export default function MobileOffice({
     const base =
       process.env.NEXT_PUBLIC_PEPTIBRA_FILES_URL ||
       "https://peptibra-api.peptibra-management.workers.dev/files";
+    const inventoryUnits=products.reduce((sum,product)=>sum+Math.max(0,stock(product.id)),0);
+    const pendingRetailValue=products.reduce((sum,product)=>sum+Math.max(0,stock(product.id))*Math.max(0,Number(product.normal_price||product.price||0)),0);
     return (
       <>
         <PageHead
@@ -629,8 +631,9 @@ export default function MobileOffice({
           onAction={() => setModal("Nuevo producto")}
         />
         <div className="inventory-total-card">
-          <span><small>Total disponible</small><b>{products.reduce((sum, product) => sum + stock(product.id), 0)} unidades</b></span>
+          <span><small>Total disponible</small><b>{inventoryUnits} unidades</b></span>
           <span><small>Presentaciones activas</small><b>{products.length}</b></span>
+          <span className="inventory-potential"><small>Pendiente por vender <em>Valor potencial al precio actual</em></small><b>{money(pendingRetailValue)}</b></span>
         </div>
         {isAdmin && (
           <div className="inventory-admin-actions">
