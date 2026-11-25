@@ -1,4 +1,22 @@
+const targets = [
+  [6.7,35],[20.5,35],[11.5,46],[16.2,46],[10.7,66],[17.2,66],
+  [31.2,35],[45.1,35],[35.2,47],[41.1,47],[35.7,55],[40.6,55],
+  [55.2,35],[69.3,35],[60.1,46],[64.8,46],[59.4,66],[66.2,66],
+  [79.8,35],[93.8,35],[84.0,47],[89.9,47],[84.5,55],[89.4,55],
+];
+const zoneLabels = [["BRAZOS","Cara externa y posterior"],["ABDOMEN","A ambos lados, lejos del ombligo"],["FLANCOS","Costados del abdomen"],["MUSLOS","Zona frontal y lateral"],["GLÚTEOS","Cuadrante superior externo"]];
+
 export default function InjectionZones(){
-  const targets=[[30,34],[70,34],[38,51],[62,51],[40,83],[60,83],[130,35],[170,35],[136,54],[164,54],[142,72],[158,72]];
-  return <section className="injection-zones" aria-label="Zonas generales de aplicación subcutánea"><p>Referencia anatómica general. Rota las zonas y evita piel lesionada, irritada o endurecida.</p><div className="zones-board"><svg viewBox="0 0 200 110" role="img" aria-label="Vista frontal y posterior con zonas de aplicación"><g className="body"><circle cx="50" cy="13" r="8"/><rect x="36" y="21" width="28" height="45" rx="12"/><path d="M38 28 26 61M62 28 74 61M42 63 39 102M58 63 61 102"/><circle cx="150" cy="13" r="8"/><rect x="136" y="21" width="28" height="45" rx="12"/><path d="M138 28 126 61M162 28 174 61M142 63 139 102M158 63 161 102"/></g>{targets.map(([x,y],i)=><g className="zone-target" key={i}><circle cx={x} cy={y} r="3.8"/><circle cx={x} cy={y} r="1.25"/></g>)}<text x="50" y="108">FRENTE</text><text x="150" y="108">ESPALDA</text></svg><div className="zone-labels"><span><b>BRAZOS</b>Cara externa y posterior</span><span><b>ABDOMEN</b>A ambos lados</span><span><b>FLANCOS</b>Costados del abdomen</span><span><b>MUSLOS</b>Frontal y lateral</span><span><b>GLÚTEOS</b>Cuadrante superior externo</span></div></div><aside><b>ANTES DE APLICAR</b><span>Aléjate al menos 5 cm del ombligo, rota las zonas y usa material estéril nuevo. Consulta siempre las instrucciones del producto.</span></aside></section>
+  return <section className="injection-zones" aria-label="Zonas generales de aplicación subcutánea">
+    <header className="zones-intro"><div><small>REFERENCIA ANATÓMICA GENERAL</small><h2>Rota el lugar de aplicación</h2></div><p>Alterna las zonas para favorecer el cuidado de la piel. Evita áreas irritadas, endurecidas, lesionadas o con cicatrices.</p></header>
+    <div className="zones-board">
+      <div className="zones-figure" role="img" aria-label="Mujer y hombre de frente y espalda con zonas generales de aplicación subcutánea">
+        <img src="/protocols/subcutaneous-figures-v2.png" alt="" />
+        {targets.map(([left,top],index)=><i className="zone-target" key={index} style={{left:`${left}%`,top:`${top}%`}}><span/></i>)}
+        <div className="figure-captions"><span>MUJER · FRENTE</span><span>MUJER · ESPALDA</span><span>HOMBRE · FRENTE</span><span>HOMBRE · ESPALDA</span></div>
+      </div>
+      <div className="zone-labels">{zoneLabels.map(([title,detail],index)=><span key={title}><i>{String(index+1).padStart(2,"0")}</i><b>{title}</b><em>{detail}</em></span>)}</div>
+    </div>
+    <aside><i>!</i><div><b>ANTES DE APLICAR</b><span>Aléjate al menos 5 cm del ombligo, limpia la piel y deja secar el alcohol. Utiliza material estéril nuevo y sigue siempre las indicaciones del producto o de un profesional autorizado.</span></div></aside>
+  </section>
 }

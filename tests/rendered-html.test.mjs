@@ -461,3 +461,16 @@ test("la oficina heredada duplicada fue retirada", async () => {
   await assert.rejects(read("app/admin/AdminDashboard.tsx"));
   await assert.rejects(read("app/api/products/route.ts"));
 });
+
+test("la guía subcutánea impresa usa ilustraciones premium de mujer y hombre", async () => {
+  const [zones, css] = await Promise.all([
+    read("app/ptbr-mobile/protocols/[id]/InjectionZones.tsx"),
+    read("app/globals.css"),
+  ]);
+  assert.match(zones, /subcutaneous-figures-v2\.png/);
+  assert.match(zones, /MUJER · FRENTE/);
+  assert.match(zones, /HOMBRE · ESPALDA/);
+  assert.match(zones, /targets\.map/);
+  assert.match(css, /\.zones-figure/);
+  assert.match(css, /\.zone-target/);
+});
