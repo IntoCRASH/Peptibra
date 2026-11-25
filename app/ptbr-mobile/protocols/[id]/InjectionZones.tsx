@@ -12,7 +12,7 @@ export default function InjectionZones(){
     <div className="zones-board">
       <div className="zones-figure" role="img" aria-label="Mujer y hombre de frente y espalda con zonas generales de aplicación subcutánea">
         <img src="/protocols/subcutaneous-figures-v2.png" alt="" />
-        {targets.map(([left,top],index)=><i className="zone-target" key={index} style={{left:`${left}%`,top:`${top}%`}}><span/></i>)}
+        <div className="zones-target-layer" aria-hidden="true">{targets.map(([left,top],index)=><i className="zone-target" key={index} style={{left:`${left}%`,top:`${top}%`}}><span/></i>)}</div>
         <div className="figure-captions"><span>MUJER · FRENTE</span><span>MUJER · ESPALDA</span><span>HOMBRE · FRENTE</span><span>HOMBRE · ESPALDA</span></div>
       </div>
       <div className="zone-labels">{zoneLabels.map(([title,detail],index)=><span key={title}><i>{String(index+1).padStart(2,"0")}</i><b>{title}</b><em>{detail}</em></span>)}</div>
