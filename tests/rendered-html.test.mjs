@@ -474,3 +474,14 @@ test("la guía subcutánea impresa usa ilustraciones premium de mujer y hombre",
   assert.match(css, /\.zones-figure/);
   assert.match(css, /\.zone-target/);
 });
+
+test("los protocolos imprimibles cargan la fotografía del producto con fallback", async () => {
+  const [protocol, css] = await Promise.all([
+    read("app/ptbr-mobile/protocols/[id]/ProtocolPrint.tsx"),
+    read("app/globals.css"),
+  ]);
+  assert.match(protocol, /api\/catalog\/image\?key=/);
+  assert.match(protocol, /onError=\{\(\)=>setFailed\(true\)\}/);
+  assert.match(protocol, /<ProductPhoto product=\{product\}/);
+  assert.match(css, /\.protocol-product-image img/);
+});
