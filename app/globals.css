@@ -97,6 +97,7 @@ footer p,footer .shell>span{color:#777}
 @media(max-width:620px){.pb-header{grid-template-columns:150px 1fr auto;gap:8px}.pb-header>.language-switcher span{display:none}.pb-header>.language-switcher select{width:82px;padding-left:8px}.pb-header>.pb-login{display:none}.verification-card>.language-switcher span{display:inline}}
 .pb-legal-disclaimer{background:#06142f;color:#cbb4b9;border-top:1px solid #4c2731;padding:42px max(48px,calc((100vw - 1344px)/2)) 48px}
 .pb-legal-disclaimer>div{max-width:1120px}.pb-legal-disclaimer strong{display:block;color:#fff;font-size:12px;letter-spacing:.14em;margin-bottom:22px}.pb-legal-disclaimer p{font-size:11px;line-height:1.75;margin:0 0 14px;color:#bda7ac}.pb-legal-disclaimer p b{color:#e2d2d5}.pb-legal-disclaimer small{display:block;margin-top:24px;padding-top:18px;border-top:1px solid #3f2028;color:#8f777d;font-size:10px}
+.public-visit-counter{padding:11px 20px 13px;background:#040d20;color:#77859d;text-align:center;font-size:10px;letter-spacing:.035em}.public-visit-counter b{color:#aeb8c9;font-size:11px;font-weight:800}
 @media(max-width:620px){.pb-legal-disclaimer{padding:32px 20px 38px}.pb-legal-disclaimer p{font-size:10px;line-height:1.7}}
 
 /* Contact */

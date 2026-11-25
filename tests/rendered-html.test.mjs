@@ -521,3 +521,14 @@ test("Productos muestra el valor potencial del inventario disponible", async () 
   assert.match(office, /Valor potencial al precio actual/);
   assert.match(office, /Math\.max\(0,stock\(product\.id\)\)\*Math\.max\(0,Number\(product\.normal_price\|\|product\.price\|\|0\)\)/);
 });
+
+test("la portada pública muestra un contador persistente de visitas", async () => {
+  const home = await read("app/page.tsx");
+  const counter = await read("app/VisitCounter.tsx");
+  const route = await read("app/api/visits/route.ts");
+  assert.match(home, /<VisitCounter\/>/);
+  assert.match(counter, /Este sitio ha sido visitado/);
+  assert.match(route, /public_home_visits/);
+  assert.match(route, /30 \* 60/);
+  assert.match(route, /ON CONFLICT\(key\) DO UPDATE/);
+});
