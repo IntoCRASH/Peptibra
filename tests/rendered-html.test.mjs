@@ -505,4 +505,9 @@ test("Caja filtra y desglosa cobros por método de pago", async () => {
   assert.match(office, /paymentMethodTotals/);
   assert.match(office, /Cobros confirmados por método/);
   assert.match(office, /Detalle de todos los métodos/);
+  assert.match(office, /cashSellerId/);
+  assert.match(office, /cashProductId/);
+  assert.match(office, /Vendedor<select/);
+  assert.match(office, /Producto<select/);
+  assert.match(office, /invoiceProducts/);
 });

@@ -42,6 +42,8 @@ export default function MobileOffice({
     [cashRange, setCashRange] = useState<"month" | "year" | "all">("month"),
     [cashYear, setCashYear] = useState(() => currentMonthValue().slice(0, 4)),
     [cashPaymentMethod, setCashPaymentMethod] = useState("Todos"),
+    [cashSellerId, setCashSellerId] = useState("Todos"),
+    [cashProductId, setCashProductId] = useState("Todos"),
     [inventoryDrafts, setInventoryDrafts] = useState<Record<number, string>>({}),
     [selectedDeliveryInvoices, setSelectedDeliveryInvoices] = useState<number[]>([]);
   const inventoryPending = useRef(new Map<number, number>()),
@@ -945,11 +947,16 @@ export default function MobileOffice({
   function Cash() {
     const matchesRange = (row: Row) =>
       cashRange==="all" || rowMonth(row).startsWith(cashRange==="year" ? cashYear : reportMonth);
-    const periodInvoices = invoices.filter(matchesRange);
+    const invoiceProducts=new Map<number,Set<number>>();for(const item of invoiceItems){const invoiceId=Number(item.invoice_id),productId=Number(item.product_id),ids=invoiceProducts.get(invoiceId)||new Set<number>();ids.add(productId);invoiceProducts.set(invoiceId,ids)}
+    const rangeInvoices = invoices.filter(matchesRange).filter(invoice=>(cashSellerId==="Todos"||Number(invoice.seller_id)===Number(cashSellerId))&&(cashProductId==="Todos"||invoiceProducts.get(Number(invoice.id))?.has(Number(cashProductId))));
+    const rangeInvoiceIds=new Set(rangeInvoices.map(invoice=>Number(invoice.id)));
+    const rangePayments=payments.filter(payment=>rangeInvoiceIds.has(Number(payment.invoice_id)));
+    const methodInvoiceIds=new Set(rangePayments.filter(payment=>cashPaymentMethod==="Todos"||String(payment.method||"Sin especificar")===cashPaymentMethod).map(payment=>Number(payment.invoice_id)));
+    const periodInvoices = cashPaymentMethod==="Todos"?rangeInvoices:rangeInvoices.filter(invoice=>methodInvoiceIds.has(Number(invoice.id)));
     const invoicesById = new Map(invoices.map(invoice => [Number(invoice.id), invoice]));
     const periodInvoiceIds = new Set(periodInvoices.map(invoice => Number(invoice.id)));
     const periodCash = cash.filter(matchesRange);
-    const periodPayments = payments.filter(matchesRange);
+    const periodPayments = rangePayments;
     const paymentMethods = [...new Set(payments.map(payment=>String(payment.method||"Sin especificar")).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
     const filteredPayments = cashPaymentMethod==="Todos" ? periodPayments : periodPayments.filter(payment=>String(payment.method||"Sin especificar")===cashPaymentMethod);
     const paymentMethodTotals = periodPayments.reduce((totals,payment)=>{const method=String(payment.method||"Sin especificar");totals.set(method,(totals.get(method)||0)+Number(payment.applied_usd||0));return totals},new Map<string,number>());
@@ -1042,6 +1049,8 @@ export default function MobileOffice({
           {cashRange==="month"&&<label>Mes y año<input type="month" value={reportMonth} max={currentMonthValue()} onChange={event=>setReportMonth(event.target.value||currentMonthValue())}/></label>}
           {cashRange==="year"&&<label>Año<select value={cashYear} onChange={event=>setCashYear(event.target.value)}>{availableYears.map(year=><option key={year}>{year}</option>)}</select></label>}
           <label>Método de pago<select value={cashPaymentMethod} onChange={event=>setCashPaymentMethod(event.target.value)}><option>Todos</option>{paymentMethods.map(method=><option key={method}>{method}</option>)}</select></label>
+          <label>Vendedor<select value={cashSellerId} onChange={event=>setCashSellerId(event.target.value)}><option>Todos</option>{team.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),"es")).map(member=><option key={String(member.id)} value={String(member.id)}>{String(member.name)}</option>)}</select></label>
+          <label>Producto<select value={cashProductId} onChange={event=>setCashProductId(event.target.value)}><option>Todos</option>{products.slice().sort((a,b)=>`${String(a.name)} ${String(a.concentration)}`.localeCompare(`${String(b.name)} ${String(b.concentration)}`,"es")).map(product=><option key={String(product.id)} value={String(product.id)}>{String(product.name)} {String(product.concentration)}</option>)}</select></label>
           <strong>{rangeLabel}</strong>
           {isAdmin&&<button type="button" className="secondary" onClick={async()=>{if(!window.confirm("Se compararán los cobros de Caja con los pagos confirmados y se corregirán únicamente los excedentes. ¿Continuar?"))return;const result=await post("reconcileInvoiceCash",{});if(result?.ok)window.alert(result.corrected>0?`Conciliación completada: ${money(result.corrected)} corregidos.`:"No se encontraron diferencias.")}}>Conciliar cobros</button>}
         </section>
